@@ -14,6 +14,53 @@ import pandas as pd
 import numpy as np
 from prettytable import PrettyTable
 
+
+
+import matplotlib.pyplot as plt
+import random
+
+# Function to visualize original and noisy beats separately
+def plot_ecg_comparison_separate(X_data, y_data, indices, title, num_beats=5):
+    """
+    Visualizes the original and noisy ECG beats separately.
+    
+    Parameters:
+    X_data: Noisy ECG beats (X_train or X_test)
+    y_data: Original ECG beats (y_train or y_test)
+    indices: Valid indices for the beats
+    title: Title for the plot
+    num_beats: Number of beats to visualize
+    """
+    # Randomly select a subset of valid indices for visualization
+    if len(indices) < num_beats:
+        num_beats = len(indices)  # Ensure we don't sample more than available valid beats
+    selected_indices = random.sample(indices, num_beats)
+
+    plt.figure(figsize=(15, num_beats * 4))
+
+    for i, idx in enumerate(selected_indices):
+        # Original beat plot
+        plt.subplot(num_beats, 2, 2*i + 1)
+        plt.plot(y_data[idx], label="Original Beat", color="blue")
+        plt.title(f"{title} - Original Beat {idx}")
+        plt.legend()
+
+        # Noisy beat plot
+        plt.subplot(num_beats, 2, 2*i + 2)
+        plt.plot(X_data[idx], label="Noisy Beat", color="orange", linestyle="--")
+        plt.title(f"{title} - Noisy Beat {idx}")
+        plt.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+
+# # Visualize the comparison for training data
+# plot_ecg_comparison_separate(X_train, y_train, valid_train_indices, "Training Set", num_beats=5)
+
+# # Visualize the comparison for testing data
+# plot_ecg_comparison_separate(X_test, y_test, valid_test_indices, "Testing Set", num_beats=5)
+
 def generate_violinplots(np_data, description, ylabel, log):
     # Process the results and store in Panda objects
 
@@ -165,8 +212,6 @@ def ecg_view_diff(ecg, ecg_blw, ecg_dl, ecg_f, signal_name=None, beat_no=None):
 
 def generate_table(metrics, metric_values, Exp_names):
     # Print tabular results in the console, in a pretty way
-    print('\n')
-
     tb = PrettyTable()
     ind = 0
 
@@ -195,8 +240,6 @@ def generate_table_time(column_names, all_values, Exp_names, gpu=True):
     # We need circular shift them to the right
     all_values[0] = all_values[0][-2::] + all_values[0][0:-2]
     all_values[1] = all_values[1][-2::] + all_values[1][0:-2]
-
-    print('\n')
 
     tb = PrettyTable()
     ind = 0

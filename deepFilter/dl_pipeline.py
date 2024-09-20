@@ -1,23 +1,11 @@
-#============================================================
-#
-#  Deep Learning BLW Filtering
-#  Deep Learning pipelines
-#
-#  author: Francisco Perdigon Romero
-#  email: fperdigon88@gmail.com
-#  github id: fperdigon
-#
-#===========================================================
-
 import keras
 from keras import backend as K
 from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping, TensorBoard
 from keras import losses
 from sklearn.model_selection import train_test_split
+import tensorflow as tf 
 
 import deepFilter.dl_models as models
-
-
 # Custom loss SSD
 def ssd_loss(y_true, y_pred):
     return K.sum(K.square(y_pred - y_true), axis=-2)
@@ -50,7 +38,6 @@ def train_dl(Dataset, experiment):
     # LOAD THE DL MODEL
     # ==================
 
-
     if experiment == 'FCN-DAE':
         # FCN_DAE
         model = models.FCN_DAE()
@@ -69,7 +56,7 @@ def train_dl(Dataset, experiment):
     if experiment == 'Vanilla NL':
         # Vanilla CNN non linear
         model = models.deep_filter_vanilla_Nlinear()
-        model_label = 'Vanilla_NL'
+        model_label = 'Vanilla_NL'    
 
     if experiment == 'Multibranch LANL':
         # Multibranch linear and non linear
@@ -80,13 +67,23 @@ def train_dl(Dataset, experiment):
         # Inception-like linear and non linear dilated
         model = models.deep_filter_model_I_LANL_dilated()
         model_label = 'Multibranch_LANLD'
-
+        
+    if experiment == 'Transformer_DAE':
+        # Transformer_DAE
+        model = models.Transformer_DAE()
+        model_label = 'Transformer_DAE'
+    
+    if experiment == 'Transformer_FDAE':
+        # Transformer_FDAE
+        model = models.Transformer_FDAE()
+        model_label = 'Transformer_FDAE'
+    
 
     print('\n ' + model_label + '\n ')
 
     model.summary()
 
-    epochs = int(1e5)  # 100000
+    epochs = int(1e2)  # 100000
     # epochs = 100
     batch_size = 128
     lr = 1e-3
@@ -106,7 +103,7 @@ def train_dl(Dataset, experiment):
 
 
     model.compile(loss=criterion,
-                  optimizer=keras.optimizers.Adam(lr=lr),
+                  optimizer=tf.keras.optimizers.Adam(lr=lr),
                   metrics=[losses.mean_squared_error, losses.mean_absolute_error, ssd_loss, mad_loss])
 
     # Keras Callbacks
@@ -191,7 +188,7 @@ def test_dl(Dataset, experiment):
     if experiment == 'Vanilla NL':
         # Vanilla CNN non linear
         model = models.deep_filter_vanilla_Nlinear()
-        model_label = 'Vanilla_NL'
+        model_label = 'Vanilla_NL'    
 
     if experiment == 'Multibranch LANL':
         # Multibranch linear and non linear
@@ -202,7 +199,17 @@ def test_dl(Dataset, experiment):
         # Inception-like linear and non linear dilated
         model = models.deep_filter_model_I_LANL_dilated()
         model_label = 'Multibranch_LANLD'
-
+        
+    if experiment == 'Transformer_DAE':
+        # Transformer_DAE
+        model = models.Transformer_DAE()
+        model_label = 'Transformer_DAE'
+    
+    if experiment == 'Transformer_FDAE':
+        # Transformer_FDAE
+        model = models.Transformer_FDAE()
+        model_label = 'Transformer_FDAE'
+    
     print('\n ' + model_label + '\n ')
 
     model.summary()
@@ -218,7 +225,7 @@ def test_dl(Dataset, experiment):
         criterion = combined_ssd_mad_loss
 
     model.compile(loss=criterion,
-                  optimizer=keras.optimizers.Adam(lr=0.01),
+                  optimizer=tf.keras.optimizers.Adam(lr=0.01),
                   metrics=[losses.mean_squared_error, losses.mean_absolute_error, ssd_loss, mad_loss])
 
     # checkpoint

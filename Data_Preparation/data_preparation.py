@@ -1,182 +1,151 @@
-#============================================================
-#
-#  Deep Learning BLW Filtering
-#  Data preparation
-#
-#  author: Francisco Perdigon Romero
-#  email: fperdigon88@gmail.com
-#  github id: fperdigon
-#
-#===========================================================
-
+import glob
 import numpy as np
+from scipy.signal import resample_poly
+import wfdb
+import math
 import _pickle as pickle
-from Data_Preparation import Prepare_QTDatabase, Prepare_NSTDB
 
-def Data_Preparation():
+def Data_Preparation(samples,channel_ratio):
+    print('Getting the Data ready ...')
 
-    print('Getting the Data ready ... ')
-
-    # The seed is used to ensure the ECG always have the same contamination level
-    # this enhance reproducibility
+    # Set random seed for reproducibility
     seed = 1234
     np.random.seed(seed=seed)
 
-    Prepare_QTDatabase.prepare()
-    Prepare_NSTDB.prepare()
-
     # Load QT Database
     with open('data/QTDatabase.pkl', 'rb') as input:
-        # dict {register_name: beats_list}
         qtdb = pickle.load(input)
 
-    # Load NSTDB
-    with open('data/NoiseBWL.pkl', 'rb') as input:
-        nstd = pickle.load(input)
+    print(f"[INFO] Loaded QTDatabase with {len(qtdb.keys())} signals")
 
-    #####################################
-    # NSTDB
-    #####################################
-
-    noise_channel1 = nstd[:, 0]
-    noise_channel2 = nstd[:, 1]
-
+    # Load combined noise
+    with open('data/CombinedNoise.pkl', 'rb') as input:
+        combined_noise = pickle.load(input)
+    print(f"[INFO] Loaded CombinedNoise with {len(combined_noise)} channels")
 
     #####################################
     # Data split
     #####################################
-
-    noise_test = np.concatenate(
-        (noise_channel1[0:int(noise_channel1.shape[0] * 0.13)], noise_channel2[0:int(noise_channel2.shape[0] * 0.13)]))
-    noise_train = np.concatenate((noise_channel1[int(noise_channel1.shape[0] * 0.13):-1],
-                                  noise_channel2[int(noise_channel2.shape[0] * 0.13):-1]))
-
-    #####################################
-    # QTDatabase
-    #####################################
+    test_set = ['sel123', 'sel233', 'sel302', 'sel307', 'sel820', 'sel853', 
+                'sel16420', 'sel16795', 'sele0106', 'sele0121', 'sel32', 'sel49', 
+                'sel14046', 'sel15814']
 
     beats_train = []
     beats_test = []
-
-    # QTDatabese signals Dataset splitting. Considering the following link
-    # https://www.physionet.org/physiobank/database/qtdb/doc/node3.html
-    #  Distribution of the 105 records according to the original Database.
-    #  | MIT-BIH | MIT-BIH |   MIT-BIH  |  MIT-BIH  | ESC | MIT-BIH | Sudden |
-    #  | Arrhyt. |  ST DB  | Sup. Vent. | Long Term | STT | NSR DB	| Death  |
-    #  |   15    |   6	   |     13     |     4     | 33  |  10	    |  24    |
-    #
-    # The two random signals of each pathology will be keep for testing set.
-    # The following list was used
-    # https://www.physionet.org/physiobank/database/qtdb/doc/node4.html
-    # Selected test signal amount (14) represent ~13 % of the total
-
-    test_set = ['sel123',  # Record from MIT-BIH Arrhythmia Database
-                'sel233',  # Record from MIT-BIH Arrhythmia Database
-
-                'sel302',  # Record from MIT-BIH ST Change Database
-                'sel307',  # Record from MIT-BIH ST Change Database
-
-                'sel820',  # Record from MIT-BIH Supraventricular Arrhythmia Database
-                'sel853',  # Record from MIT-BIH Supraventricular Arrhythmia Database
-
-                'sel16420',  # Record from MIT-BIH Normal Sinus Rhythm Database
-                'sel16795',  # Record from MIT-BIH Normal Sinus Rhythm Database
-
-                'sele0106',  # Record from European ST-T Database
-                'sele0121',  # Record from European ST-T Database
-
-                'sel32',  # Record from ``sudden death'' patients from BIH
-                'sel49',  # Record from ``sudden death'' patients from BIH
-
-                'sel14046',  # Record from MIT-BIH Long-Term ECG Database
-                'sel15814',  # Record from MIT-BIH Long-Term ECG Database
-                ]
-
-
-    # Creating the train and test dataset, each datapoint has 512 samples and is zero padded
-    # beats bigger that 512 samples are discarded to avoid wrong split beats ans to reduce
-    # computation.
+    valid_train_indices = []  # To keep track of valid indices in training data
+    valid_test_indices = []   # To keep track of valid indices in test data
+    sn_train = []
+    sn_test = []
+    
     skip_beats = 0
-    samples = 512
+    # samples = 512
     qtdb_keys = list(qtdb.keys())
 
-    for i in range(len(qtdb_keys)):
-        signal_name = qtdb_keys[i]
+    print(f"[INFO] Processing QTDatabase, {len(qtdb_keys)} signals to process.")
 
-        for b in qtdb[signal_name]:
-
+    for signal_name in qtdb_keys:
+        for b_idx, b in enumerate(qtdb[signal_name]):
             b_np = np.zeros(samples)
             b_sq = np.array(b)
-
-            # There are beats with more than 512 samples (could be up to 3500 samples)
-            # Creating a threshold of 512 - init_padding samples max. gives a good compromise between
-            # the samples amount and the discarded signals amount
-            # before:
-            # train: 74448  test: 13362
-            # after:
-            # train: 71893 test: 13306  (discarded train: ~4k datapoints test: ~50)
 
             init_padding = 16
             if b_sq.shape[0] > (samples - init_padding):
                 skip_beats += 1
                 continue
-
+# 이 평균값을 b_sq의 각 값에서 빼는 과정은 신호의 중앙화 작업입니다. 즉, 신호의 값들이 배열의 양 끝 값의 평균을 기준으로 대칭적으로 배치되도록 변환됩니다.
+# 이 계산을 통해 신호의 첫 값과 마지막 값에 대한 편향을 제거하고, 신호를 중앙으로 이동시키는 효과가 있습니다.
             b_np[init_padding:b_sq.shape[0] + init_padding] = b_sq - (b_sq[0] + b_sq[-1]) / 2
 
             if signal_name in test_set:
                 beats_test.append(b_np)
+                valid_test_indices.append(len(beats_test) - 1)  # Track valid test beat index
             else:
                 beats_train.append(b_np)
+                valid_train_indices.append(len(beats_train) - 1)  # Track valid train beat index
 
+        print(f"[DEBUG] Processed signal {signal_name}, total beats in train: {len(beats_train)}, total beats in test: {len(beats_test)}")
 
-    # Noise was added in a proportion from 0.2 to 2 times the ECG signal amplitude
-    # Similar to
-    # W. Muldrow, R.G. Mark, & Moody, G. B. (1984).
-    # A noise stress test for arrhythmia detectors.
-    # Computers in Cardiology, 381–384
-
-    sn_train = []
-    sn_test = []
-
-    noise_index = 0
-
-    # Adding noise to train
+    #####################################
+    # Adding noise to train and test sets
+    #####################################
+    print(f"[INFO] Adding noise to train and test sets")
+    # Random scaling factor for train and test
     rnd_train = np.random.randint(low=20, high=200, size=len(beats_train)) / 100
-    for i in range(len(beats_train)):
-        noise = noise_train[noise_index:noise_index + samples]
-        beat_max_value = np.max(beats_train[i]) - np.min(beats_train[i])
-        noise_max_value = np.max(noise) - np.min(noise)
-        Ase = noise_max_value / beat_max_value
-        alpha = rnd_train[i] / Ase
-        signal_noise = beats_train[i] + alpha * noise
-        sn_train.append(signal_noise)
-        noise_index += samples
-
-        if noise_index > (len(noise_train) - samples):
-            noise_index = 0
-
+    noise_index = 0
+    # Adding noise to train
+    for beat_idx, beat in enumerate(beats_train):
+        if np.random.rand() < channel_ratio:
+            noise_combination_idx = np.random.randint(1, 8)  # 8 types of noise combinations
+            noise = combined_noise[0][:, noise_combination_idx]
+            noise_segment = noise[noise_index:noise_index + samples]
+            beat_max_value = np.max(beat) - np.min(beat)
+            noise_max_value = np.max(noise_segment) - np.min(noise_segment)
+            Ase = noise_max_value / beat_max_value
+            alpha = rnd_train[beat_idx] / Ase
+            signal_noise = beat + alpha * noise_segment
+            sn_train.append(signal_noise)
+            noise_index += samples
+            if noise_index > (len(noise) - samples):
+                noise_index = 0
+            valid_train_indices.append(beat_idx)  # Only track valid beats
+        else :
+            noise_combination_idx = np.random.randint(1, 8)  # 8 types of noise combinations
+            noise = combined_noise[1][:, noise_combination_idx]
+            noise_segment = noise[noise_index:noise_index + samples]
+            beat_max_value = np.max(beat) - np.min(beat)
+            noise_max_value = np.max(noise_segment) - np.min(noise_segment)
+            Ase = noise_max_value / beat_max_value
+            alpha = rnd_train[beat_idx] / Ase
+            signal_noise = beat + alpha * noise_segment
+            sn_train.append(signal_noise)
+            noise_index += samples
+            if noise_index > (len(noise) - samples):
+                noise_index = 0
+            valid_train_indices.append(beat_idx)  # Only track valid beats
+                
     # Adding noise to test
     noise_index = 0
     rnd_test = np.random.randint(low=20, high=200, size=len(beats_test)) / 100
-    for i in range(len(beats_test)):
-        noise = noise_test[noise_index:noise_index + samples]
-        beat_max_value = np.max(beats_test[i]) - np.min(beats_test[i])
-        noise_max_value = np.max(noise) - np.min(noise)
-        Ase = noise_max_value / beat_max_value
-        alpha = rnd_test[i] / Ase
-        signal_noise = beats_test[i] + alpha * noise
-        sn_test.append(signal_noise)
-        noise_index += samples
+    # Saving the random array so we can use it on the amplitude segmentation tables
+    np.save('rnd_test.npy', rnd_test)
+    print('rnd_test shape: ' + str(rnd_test.shape))
+    
+    for beat_idx, beat in enumerate(beats_test):
+        if np.random.rand() < channel_ratio:
+            noise_combination_idx = np.random.randint(1, 8)  # 8 types of noise combinations
+            noise = combined_noise[0][:, noise_combination_idx]
+            noise_segment = noise[noise_index:noise_index + samples]
+            beat_max_value = np.max(beat) - np.min(beat)
+            noise_max_value = np.max(noise_segment) - np.min(noise_segment)
+            Ase = noise_max_value / beat_max_value
+            alpha = rnd_test[beat_idx] / Ase
+            signal_noise = beat + alpha * noise_segment
+            sn_test.append(signal_noise)
+            noise_index += samples
+            if noise_index > (len(noise) - samples):
+                noise_index = 0
+            valid_test_indices.append(beat_idx)  # Only track valid beats
+        else :
+            noise_combination_idx = np.random.randint(1, 8)  # 8 types of noise combinations
+            noise = combined_noise[1][:, noise_combination_idx]
+            noise_segment = noise[noise_index:noise_index + samples]
+            beat_max_value = np.max(beat) - np.min(beat)
+            noise_max_value = np.max(noise_segment) - np.min(noise_segment)
+            Ase = noise_max_value / beat_max_value
+            alpha = rnd_test[beat_idx] / Ase
+            signal_noise = beat + alpha * noise_segment
+            sn_test.append(signal_noise)
+            noise_index += samples
+            if noise_index > (len(noise) - samples):
+                noise_index = 0
+            valid_test_indices.append(beat_idx)  # Only track valid beats
+    
 
-        if noise_index > (len(noise_test) - samples):
-            noise_index = 0
+    X_train = np.array(sn_train)[valid_train_indices]  # Match noisy and original beats
+    X_test = np.array(sn_test)[valid_test_indices]
 
-
-    X_train = np.array(sn_train)
-    y_train = np.array(beats_train)
-
-    X_test = np.array(sn_test)
-    y_test = np.array(beats_test)
+    y_train = np.array(beats_train)[valid_train_indices]  # Match noisy and original beats
+    y_test = np.array(beats_test)[valid_test_indices]
 
     X_train = np.expand_dims(X_train, axis=2)
     y_train = np.expand_dims(y_train, axis=2)
@@ -184,9 +153,8 @@ def Data_Preparation():
     X_test = np.expand_dims(X_test, axis=2)
     y_test = np.expand_dims(y_test, axis=2)
 
-
     Dataset = [X_train, y_train, X_test, y_test]
-
+    print(f"[INFO] Final shapes -> X_train: {X_train.shape}, y_train: {y_train.shape}, X_test: {X_test.shape}, y_test: {y_test.shape}")
     print('Dataset ready to use.')
 
-    return Dataset
+    return Dataset, valid_train_indices, valid_test_indices

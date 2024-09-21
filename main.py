@@ -4,7 +4,7 @@ import time
 import numpy as np
 
 from utils.metrics import MAD, SSD, PRD, COS_SIM
-from utils import visualization as vs
+# from utils import visualization as vs
 from Data_Preparation import data_preparation as dp
 
 from digitalFilters.dfilters import FIR_test_Dataset, IIR_test_Dataset
@@ -13,15 +13,17 @@ from deepFilter.dl_pipeline import train_dl, test_dl
 
 if __name__ == "__main__":
 
-    dl_experiments = [
-                      'DRNN',
-                      'FCN-DAE',
-                      'Vanilla L',
-                      'Vanilla NL',
-                      'Multibranch LANL',
-                      'Multibranch LANLD',
-                      'Transformer_DAE',
-                      'Transformer_FDAE']
+    # dl_experiments = [
+    #                   'DRNN',
+    #                   'FCN-DAE',
+    #                   'Vanilla L',
+    #                   'Vanilla NL',
+    #                   'Multibranch LANL',
+    #                   'Multibranch LANLD',
+    #                   'Transformer_DAE',
+    #                   'Transformer_FDAE']
+    
+    dl_experiments = ['MemoryTransformer_DAE']
     
     Dataset, valid_train_indices, valid_test_indices = dp.Data_Preparation(samples=512, channel_ratio=0.5)
 

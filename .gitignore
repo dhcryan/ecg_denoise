@@ -18,5 +18,5 @@ utils/__pycache__/*
 *.zip
 tes*
 .directory
-*.ipynb
+DeepFilter.ipynb
 *.txt

@@ -28,7 +28,6 @@ def PRD(y, y_pred):
 
     return PRD
 
-
 def COS_SIM(y, y_pred):
     cos_sim = []
 

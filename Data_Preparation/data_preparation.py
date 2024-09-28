@@ -157,4 +157,4 @@ def Data_Preparation(samples,channel_ratio):
     print(f"[INFO] Final shapes -> X_train: {X_train.shape}, y_train: {y_train.shape}, X_test: {X_test.shape}, y_test: {y_test.shape}")
     print('Dataset ready to use.')
 
-    return Dataset, valid_train_indices, valid_test_indices
+    return Dataset, valid_train_indices, valid_test_indices, noise_indices_train, noise_indices_test

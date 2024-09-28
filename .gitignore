@@ -4,6 +4,7 @@
 /.idea/*
 /run*/*
 deepFilter/__pycache__/*
+digitalFilter/__pycache__/*
 utils/__pycache__/*
 /data/*
 
@@ -18,5 +19,4 @@ utils/__pycache__/*
 *.zip
 tes*
 .directory
-DeepFilter.ipynb
 *.txt

@@ -1,5 +1,11 @@
 import numpy as np
 from scipy.fft import fft
+import glob
+from scipy.signal import resample_poly
+import wfdb
+import math
+import _pickle as pickle
+
 
 def make_fourier(inputs, n, fs):
     """

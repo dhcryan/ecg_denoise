@@ -3,8 +3,6 @@ from keras.models import Sequential, Model
 from keras.layers import Dense, Conv1D, Flatten, Dropout, BatchNormalization,\
                          concatenate, Activation, Input, Conv2DTranspose, Lambda, LSTM, GRU,Reshape, Embedding, GlobalAveragePooling1D,\
                          Multiply,Bidirectional
-
-
 import keras.backend as K
 from keras import layers
 import tensorflow as tf
@@ -515,18 +513,7 @@ def DRRN_denoising():
 
     return model
 
-import keras
-from keras.models import Sequential, Model
-from keras.layers import Dense, Conv1D, Flatten, Dropout, BatchNormalization,\
-                         concatenate, Activation, Input, Conv2DTranspose, Lambda, LSTM, GRU,Reshape, Embedding, GlobalAveragePooling1D,\
-                         Multiply,Bidirectional
 
-
-import keras.backend as K
-from keras import layers
-import tensorflow as tf
-import numpy as np
-from scipy import signal
 
 
 sigLen = 512
@@ -633,7 +620,7 @@ def Transformer_DAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_
                strides=2,
                padding='same')(xmul1)
     x2 = AddGatedNoise()(x2)
-    # 应用sigmoid激活函数
+
     x2 = layers.Activation('sigmoid')(x2)
     # x2 = Dropout(0.3)(x2)
     x2_ = Conv1D(filters=64,
@@ -693,6 +680,13 @@ def Transformer_DAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_
     model = Model(inputs=[input], outputs=predictions)
     return model
 
+def get_emb(sin_inp):
+    """
+    Gets a base embedding for one dimension with sin and cos intertwined
+    """
+    emb = tf.stack((tf.sin(sin_inp), tf.cos(sin_inp)), -1)
+    emb = tf.reshape(emb, (*emb.shape[:-2], -1))
+    return emb
 
 class TFPositionalEncoding1D(tf.keras.layers.Layer):
     def __init__(self, channels: int, dtype=tf.float32):
@@ -830,7 +824,6 @@ def Transformer_COMBDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,
     # f2 = frequency_branch(f1, 64)    
     # 시간 및 주파수 도메인 특성 결합
     combined = layers.Concatenate()([xmul2, f2])    
-    #位置编码
     position_embed = TFPositionalEncoding1D(signal_size)
     x3 = combined+position_embed(combined)
     #

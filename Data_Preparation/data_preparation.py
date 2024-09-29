@@ -36,6 +36,8 @@ def Data_Preparation(samples,channel_ratio):
     valid_test_indices = []   # To keep track of valid indices in test data
     sn_train = []
     sn_test = []
+    noise_indices_train = []
+    noise_indices_test = []    
     
     skip_beats = 0
     # samples = 512
@@ -84,6 +86,7 @@ def Data_Preparation(samples,channel_ratio):
             alpha = rnd_train[beat_idx] / Ase
             signal_noise = beat + alpha * noise_segment
             sn_train.append(signal_noise)
+            noise_indices_train.append(noise_combination_idx)  # 노이즈 인덱스 저장
             noise_index += samples
             if noise_index > (len(noise) - samples):
                 noise_index = 0
@@ -98,6 +101,7 @@ def Data_Preparation(samples,channel_ratio):
             alpha = rnd_train[beat_idx] / Ase
             signal_noise = beat + alpha * noise_segment
             sn_train.append(signal_noise)
+            noise_indices_train.append(noise_combination_idx)  # 노이즈 인덱스 저장     
             noise_index += samples
             if noise_index > (len(noise) - samples):
                 noise_index = 0
@@ -121,6 +125,7 @@ def Data_Preparation(samples,channel_ratio):
             alpha = rnd_test[beat_idx] / Ase
             signal_noise = beat + alpha * noise_segment
             sn_test.append(signal_noise)
+            noise_indices_test.append(noise_combination_idx)  # 노이즈 인덱스 저장
             noise_index += samples
             if noise_index > (len(noise) - samples):
                 noise_index = 0
@@ -135,6 +140,7 @@ def Data_Preparation(samples,channel_ratio):
             alpha = rnd_test[beat_idx] / Ase
             signal_noise = beat + alpha * noise_segment
             sn_test.append(signal_noise)
+            noise_indices_test.append(noise_combination_idx)  # 노이즈 인덱스 저장      
             noise_index += samples
             if noise_index > (len(noise) - samples):
                 noise_index = 0

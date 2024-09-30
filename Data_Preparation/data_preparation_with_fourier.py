@@ -47,7 +47,6 @@ def Data_Preparation_with_Fourier(samples, channel_ratio, fs=360):
         qtdb = pickle.load(input)
 
     print(f"[INFO] Loaded QTDatabase with {len(qtdb.keys())} signals")
-
     # Load combined noise
     with open('data/CombinedNoise.pkl', 'rb') as input:
         combined_noise = pickle.load(input)

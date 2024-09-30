@@ -32,7 +32,7 @@ def train_dl(Dataset, experiment):
 
     print('Deep Learning pipeline: Training the model for exp ' + str(experiment))
     
-    if experiment == 'Transformer_COMBDAE':
+    if experiment == 'Transformer_COMBDAE_with_CrossDomainAttention':
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
 
         # F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
@@ -52,9 +52,11 @@ def train_dl(Dataset, experiment):
         model = Transformer_DAE()
         model_label = 'Transformer_DAE'
     elif experiment == 'Transformer_COMBDAE':
-        model = Transforme_COMBDAE()
+        model = Transformer_COMBDAE()
         model_label = 'Transformer_COMBDAE'
-
+    elif experiment == 'Transformer_COMBDAE_with_CrossDomainAttention':
+        model = Transformer_COMBDAE_with_CrossDomainAttention()
+        model_label = 'Transformer_COMBDAE_with_CrossDomainAttention'
     print('\n ' + model_label + '\n ')
 
     model.summary()
@@ -124,7 +126,7 @@ def train_dl(Dataset, experiment):
     # tensorboard --logdir=./runs_new
 
     # GPU
-    if experiment == 'Transformer_COMBDAE':
+    if experiment == 'Transformer_COMBDAE_with_CrossDomainAttention':
         model.fit(x=[X_train, F_train_x], y=y_train,
                 validation_data=([X_val, F_val_x], y_val),
                 batch_size=batch_size,
@@ -152,7 +154,7 @@ def test_dl(Dataset, experiment):
 
     print('Deep Learning pipeline: Testing the model')
 
-    if experiment == 'Transformer_COMBDAE':
+    if experiment == 'Transformer_COMBDAE_with_CrossDomainAttention':
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
 
         # F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
@@ -174,9 +176,11 @@ def test_dl(Dataset, experiment):
         model = Transformer_DAE()
         model_label = 'Transformer_DAE'
     elif experiment == 'Transformer_COMBDAE':
-        model = Transforme_COMBDAE()
+        model = Transformer_COMBDAE()
         model_label = 'Transformer_COMBDAE'
-    
+    elif experiment == 'Transformer_COMBDAE_with_CrossDomainAttention':
+        model = Transformer_COMBDAE_with_CrossDomainAttention()
+        model_label = 'Transformer_COMBDAE_with_CrossDomainAttention'
     print('\n ' + model_label + '\n ')
 
     model.summary()
@@ -204,7 +208,7 @@ def test_dl(Dataset, experiment):
     # load weights
     model.load_weights(model_filepath)
     
-    if experiment == 'Transformer_COMBDAE':
+    if experiment == 'Transformer_COMBDAE_with_CrossDomainAttention':
         # Test score
         y_pred = model.predict([X_test, F_test_x], batch_size=batch_size, verbose=1)
 

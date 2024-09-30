@@ -23,8 +23,8 @@ if __name__ == "__main__":
     #                   'Multibranch LANL',
     #                   'Multibranch LANLD',
     #                   'Transformer_DAE',
-    #                   'Transformer_FDAE']
-    dl_experiments = ['Transformer_DAE', 'Transformer_COMBDAE']
+    #                   'Transformer_COMBDAE', 'Transformer_COMBDAE_with_CrossDomainAttention]
+    dl_experiments = ['Transformer_COMBDAE_with_CrossDomainAttention']
 
     train_time_list = []
     test_time_list = []
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     current_date = datetime.now().strftime('%m%d')
     
     for experiment in range(len(dl_experiments)):
-        if experiment == 'Transformer_COMBDAE':
+        if dl_experiments[experiment] == 'Transformer_COMBDAE_with_CrossDomainAttention':
             Dataset, valid_train_indices, valid_test_indices, noise_indices_train, noise_indices_test = Data_Preparation_with_Fourier(samples=512, channel_ratio=0.5, fs=360)
             start_train = datetime.now()
             train_dl(Dataset, dl_experiments[experiment])
@@ -56,7 +56,6 @@ if __name__ == "__main__":
             with open(os.path.join(save_dir, 'test_results_' + dl_experiments[experiment] + '.pkl'), 'wb') as output:  # Overwrites any existing file.
                 pickle.dump(test_results, output)
             print('Results from experiment ' + dl_experiments[experiment] + ' saved')
-        
         else:
             Dataset, valid_train_indices, valid_test_indices, noise_indices_train, noise_indices_test = Data_Preparation(samples=512, channel_ratio=0.5)
             start_train = datetime.now()

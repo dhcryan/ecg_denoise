@@ -90,7 +90,7 @@ def Data_Preparation(samples,channel_ratio):
             noise_index += samples
             if noise_index > (len(noise) - samples):
                 noise_index = 0
-            valid_train_indices.append(beat_idx)  # Only track valid beats
+            # valid_train_indices.append(beat_idx)  # Only track valid beats
         else :
             noise_combination_idx = np.random.randint(1, 8)  # 8 types of noise combinations
             noise = combined_noise[1][:, noise_combination_idx]
@@ -105,7 +105,7 @@ def Data_Preparation(samples,channel_ratio):
             noise_index += samples
             if noise_index > (len(noise) - samples):
                 noise_index = 0
-            valid_train_indices.append(beat_idx)  # Only track valid beats
+            # valid_train_indices.append(beat_idx)  # Only track valid beats
                 
     # Adding noise to test
     noise_index = 0
@@ -129,7 +129,7 @@ def Data_Preparation(samples,channel_ratio):
             noise_index += samples
             if noise_index > (len(noise) - samples):
                 noise_index = 0
-            valid_test_indices.append(beat_idx)  # Only track valid beats
+            # valid_test_indices.append(beat_idx)  # Only track valid beats
         else :
             noise_combination_idx = np.random.randint(1, 8)  # 8 types of noise combinations
             noise = combined_noise[1][:, noise_combination_idx]
@@ -144,7 +144,7 @@ def Data_Preparation(samples,channel_ratio):
             noise_index += samples
             if noise_index > (len(noise) - samples):
                 noise_index = 0
-            valid_test_indices.append(beat_idx)  # Only track valid beats
+            # valid_test_indices.append(beat_idx)  # Only track valid beats
     
 
     X_train = np.array(sn_train)[valid_train_indices]  # Match noisy and original beats

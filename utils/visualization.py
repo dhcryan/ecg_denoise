@@ -13,11 +13,279 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 from prettytable import PrettyTable
-
-
-
-import matplotlib.pyplot as plt
+from scipy.fft import fft
+from scipy.signal import spectrogram, stft
 import random
+import os
+
+# 노이즈 조합에 대한 설명을 미리 정의
+NOISE_COMBINATIONS = {
+    1: "Baseline Wander (BW) only",
+    2: "Electrode Motion (EM) only",
+    3: "Muscle Artifact (MA) only",
+    4: "BW + EM",
+    5: "BW + MA",
+    6: "EM + MA",
+    7: "BW + EM + MA"
+}
+def ensure_directory(directory):
+    """ 디렉토리가 존재하지 않으면 생성 """
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        
+def ecg_view_noisy_comparison(ecg_clean, ecg_noisy, noise_index, signal_name=None, sample_index=None, save_dir='visualizations'):
+    """
+    원래 신호와 노이즈가 추가된 신호를 시각화하고, 어떤 노이즈 조합이 사용되었는지 표시합니다.
+    
+    Parameters:
+    ecg_clean: 노이즈가 없는 원래 ECG 신호.
+    ecg_noisy: 노이즈가 추가된 ECG 신호.
+    noise_index: 8가지 노이즈 조합 중 어떤 조합이 사용되었는지 나타내는 인덱스 (1~8).
+    signal_name: 시각화할 신호의 이름 (Optional).
+    sample_index: 선택된 샘플 번호 (Optional).
+    """
+    ensure_directory(save_dir)  # 디렉토리 생성
+    fig, ax = plt.subplots(figsize=(16, 9))
+    
+    # 원래 신호 (Clean ECG)
+    plt.plot(ecg_clean, 'g', label='ECG Original (Clean)')
+    
+    # 노이즈가 추가된 신호 (Noisy ECG)
+    plt.plot(ecg_noisy, 'r', label='ECG Noisy')
+    
+    plt.grid(True)
+    plt.ylabel('Amplitude (au)')
+    plt.xlabel('Samples')
+    
+    # 범례 표시
+    leg = ax.legend()
+
+    # 노이즈 인덱스에 해당하는 노이즈 조합 정보 가져오기
+    noise_description = NOISE_COMBINATIONS.get(noise_index, "Unknown Noise Combination")
+
+    # 추가적인 시각화 정보 계산
+    amplitude_range_clean = np.max(ecg_clean) - np.min(ecg_clean)
+    amplitude_range_noisy = np.max(ecg_noisy) - np.min(ecg_noisy)
+    mean_clean = np.mean(ecg_clean)
+    mean_noisy = np.mean(ecg_noisy)
+
+    # 신호 및 샘플 번호에 대한 제목 설정 (노이즈 인덱스 포함)
+    if signal_name is not None and sample_index is not None:
+        plt.title(f"Signal {signal_name}, Sample Index: {sample_index}, Noise Index: {noise_index} ({noise_description})")
+    else:
+        plt.title(f"ECG Signal Comparison with Noise Index: {noise_index} ({noise_description})")
+
+    # 추가 정보 표시 (진폭 범위와 평균값 비교)
+    textstr = f"Amplitude Range (Clean): {amplitude_range_clean:.2f}\n"\
+              f"Amplitude Range (Noisy): {amplitude_range_noisy:.2f}\n"\
+              f"Mean (Clean): {mean_clean:.2f}\n"\
+              f"Mean (Noisy): {mean_noisy:.2f}"
+    
+    # 그래프 안에 텍스트로 추가 정보 표시
+    plt.gcf().text(0.15, 0.85, textstr, fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
+
+    # plt.show()
+    # 이미지 파일 저장
+    filename = f"ECG_Comparison_{signal_name}_Sample_{sample_index}_Noise_{noise_index}.png"
+    filepath = os.path.join(save_dir, filename)
+    plt.savefig(filepath)
+    plt.close(fig)  # 창을 닫아 메모리 해제
+
+    print(f"Saved: {filepath}")
+
+# 예시 데이터 및 시각화 호출
+def visualize_multiple_beats(X_train, y_train, noise_indices_train, num_samples=5):
+    """
+    여러 개의 신호에 대해 원래 신호와 노이즈가 추가된 신호를 비교 시각화합니다.
+    
+    Parameters:
+    X_train: 노이즈가 추가된 신호 (학습용).
+    y_train: 노이즈 없는 원래 신호 (학습용).
+    noise_indices_train: 각 신호에 대해 사용된 노이즈 조합 인덱스 리스트.
+    num_samples: 시각화할 샘플 개수.
+    """
+    # 노이즈가 추가된 신호에 맞춰 샘플 개수 조정 (노이즈 인덱스에 맞게 제한)
+    max_index = len(noise_indices_train)
+    
+    # 랜덤 샘플 선택 (노이즈가 추가된 비트만 선택)
+    sample_indices = np.random.choice(max_index, num_samples, replace=False)
+    
+    for i, idx in enumerate(sample_indices):  # 선택된 샘플에 대해 시각화
+        ecg_clean = y_train[idx].flatten()  # 원래 신호
+        ecg_noisy = X_train[idx].flatten()  # 노이즈가 추가된 신호
+        noise_idx = noise_indices_train[idx]  # 해당 신호에 추가된 노이즈 인덱스
+        
+        # 시각화 함수 호출 (샘플 인덱스 추가)
+        ecg_view_noisy_comparison(ecg_clean, ecg_noisy, noise_index=noise_idx, signal_name="SampleECG", sample_index=idx, save_dir='visualizations')
+
+
+# 시간 도메인에서 신호 시각화
+def plot_time_domain(signal, title='Signal in Time Domain', save_dir='visualizations', filename='time_domain.png'):
+    ensure_directory(save_dir)
+    plt.figure(figsize=(10, 4))
+    plt.plot(signal, label='Signal')
+    plt.title(title)
+    plt.xlabel('Time [samples]')
+    plt.ylabel('Amplitude')
+    plt.grid(True)
+    plt.legend()
+
+    # 파일 저장
+    filepath = os.path.join(save_dir, filename)
+    plt.savefig(filepath)
+    plt.close()
+    print(f"Saved: {filepath}")
+
+# 주파수 도메인에서 신호 시각화 (FFT)
+def plot_frequency_domain(signal, fs, title='Signal in Frequency Domain', save_dir='visualizations', filename='frequency_domain.png'):
+    ensure_directory(save_dir)
+    N = len(signal)
+    T = 1.0 / fs
+    yf = fft(signal)
+    xf = np.fft.fftfreq(N, T)[:N//2]
+    
+    plt.figure(figsize=(10, 4))
+    plt.plot(xf, 2.0/N * np.abs(yf[:N//2]))
+    plt.title(title)
+    plt.xlabel('Frequency [Hz]')
+    plt.ylabel('Amplitude')
+    plt.grid(True)
+
+    # 파일 저장
+    filepath = os.path.join(save_dir, filename)
+    plt.savefig(filepath)
+    plt.close()
+    print(f"Saved: {filepath}")
+
+# STFT 시각화 함수
+def plot_stft(signal, fs, title='STFT Magnitude', save_dir='visualizations', filename='stft.png', freq_min=0.01, freq_max=50):
+    ensure_directory(save_dir)
+    f, t, Zxx = stft(signal, fs=fs, nperseg=128)
+    f_limit_idx = np.where((f >= freq_min) & (f <= freq_max))
+    f_limited = f[f_limit_idx]
+    Zxx_limited = np.abs(Zxx[f_limit_idx])
+    
+    plt.figure(figsize=(10, 6))
+    plt.pcolormesh(t, f_limited, Zxx_limited, shading='gouraud')
+    plt.title(title)
+    plt.ylabel('Frequency [Hz]')
+    plt.xlabel('Time [sec]')
+    plt.colorbar(label='Magnitude')
+
+    # 파일 저장
+    filepath = os.path.join(save_dir, filename)
+    plt.savefig(filepath)
+    plt.close()
+    print(f"Saved: {filepath}")
+
+# Spectrogram 시각화 함수
+def plot_spectrogram(signal, fs, title='Spectrogram', save_dir='visualizations', filename='spectrogram.png', freq_min=0.01, freq_max=50):
+    ensure_directory(save_dir)
+    f, t, Sxx = spectrogram(signal, fs=fs, nperseg=128)
+    f_limit_idx = np.where((f >= freq_min) & (f <= freq_max))
+    f_limited = f[f_limit_idx]
+    Sxx_limited = Sxx[f_limit_idx]
+    
+    plt.figure(figsize=(10, 6))
+    plt.pcolormesh(t, f_limited, 10 * np.log10(Sxx_limited), shading='gouraud')
+    plt.title(title)
+    plt.ylabel('Frequency [Hz]')
+    plt.xlabel('Time [sec]')
+    plt.colorbar(label='Power/Frequency (dB/Hz)')
+
+    # 파일 저장
+    filepath = os.path.join(save_dir, filename)
+    plt.savefig(filepath)
+    plt.close()
+    print(f"Saved: {filepath}")
+
+def visualize_signals(y_train, X_train, fs, num_samples=3, signal_length=512, save_dir='visualizations'):
+    """
+    여러 신호에 대해 다양한 도메인에서 시각화하고, 이미지를 파일로 저장합니다.
+    
+    Parameters:
+    y_train: 클린 신호 데이터셋
+    X_train: 노이즈가 추가된 신호 데이터셋
+    fs: 샘플링 주파수
+    num_samples: 시각화할 샘플 개수 (기본값 3)
+    signal_length: 신호 길이 (기본값 512)
+    save_dir: 이미지가 저장될 디렉토리
+    """
+    ensure_directory(save_dir)  # 디렉토리 생성
+
+    # 가능한 샘플 인덱스에서 무작위로 샘플 선택
+    max_index = min(len(y_train), len(X_train))
+    sample_indices = np.random.choice(max_index, num_samples, replace=False)  # 무작위로 샘플 인덱스 선택
+    
+    # 선택된 샘플에 대해 시각화
+    for i, idx in enumerate(sample_indices):
+        clean_signal = y_train[idx][:signal_length].flatten()  # 클린 신호
+        noisy_signal = X_train[idx][:signal_length].flatten()  # 노이즈가 추가된 신호
+        
+        print(f"Visualizing Sample {idx}:")  # 실제 선택된 sample 번호 출력
+        
+        # 시간 도메인에서 신호 비교
+        plot_time_domain(
+            clean_signal, 
+            title=f'Time Domain of Clean Signal (Sample {idx})', 
+            save_dir=save_dir, 
+            filename=f'time_domain_clean_{idx}.png'
+        )
+        plot_time_domain(
+            noisy_signal, 
+            title=f'Time Domain of Noisy Signal (Sample {idx})', 
+            save_dir=save_dir, 
+            filename=f'time_domain_noisy_{idx}.png'
+        )
+        
+        # 주파수 도메인에서 신호 비교 (FFT)
+        plot_frequency_domain(
+            clean_signal, 
+            fs, 
+            title=f'Frequency Domain of Clean Signal (Sample {idx})', 
+            save_dir=save_dir, 
+            filename=f'frequency_domain_clean_{idx}.png'
+        )
+        plot_frequency_domain(
+            noisy_signal, 
+            fs, 
+            title=f'Frequency Domain of Noisy Signal (Sample {idx})', 
+            save_dir=save_dir, 
+            filename=f'frequency_domain_noisy_{idx}.png'
+        )
+        
+        # STFT 시각화
+        plot_stft(
+            clean_signal, 
+            fs, 
+            title=f'STFT of Clean Signal (Sample {idx})', 
+            save_dir=save_dir, 
+            filename=f'stft_clean_{idx}.png'
+        )
+        plot_stft(
+            noisy_signal, 
+            fs, 
+            title=f'STFT of Noisy Signal (Sample {idx})', 
+            save_dir=save_dir, 
+            filename=f'stft_noisy_{idx}.png'
+        )
+        
+        # Spectrogram 시각화
+        plot_spectrogram(
+            clean_signal, 
+            fs, 
+            title=f'Spectrogram of Clean Signal (Sample {idx})', 
+            save_dir=save_dir, 
+            filename=f'spectrogram_clean_{idx}.png'
+        )
+        plot_spectrogram(
+            noisy_signal, 
+            fs, 
+            title=f'Spectrogram of Noisy Signal (Sample {idx})', 
+            save_dir=save_dir, 
+            filename=f'spectrogram_noisy_{idx}.png'
+        )
+
 
 # Function to visualize original and noisy beats separately
 def plot_ecg_comparison_separate(X_data, y_data, indices, title, num_beats=5):

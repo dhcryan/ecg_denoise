@@ -952,13 +952,13 @@ def Transformer_COMBDAE_with_CrossDomainAttention(signal_size=sigLen, head_size=
     # 시간 도메인 및 주파수 도메인 특징에 포지셔널 인코딩 적용
     position_embed_time = TFPositionalEncoding1D(signal_size)
     x_time = xmul2 + position_embed_time(xmul2)
-    for _ in range(num_transformer_blocks):
-        x_time = transformer_encoder(x_time, head_size, num_heads, ff_dim, dropout)
+    # for _ in range(num_transformer_blocks):
+    #     x_time = transformer_encoder(x_time, head_size, num_heads, ff_dim, dropout)
     
     position_embed_freq = TFPositionalEncoding1D(signal_size)
     x_freq = f2 + position_embed_freq(f2)
-    for _ in range(num_transformer_blocks):
-        x_freq = transformer_encoder(x_freq, head_size, num_heads, ff_dim, dropout)
+    # for _ in range(num_transformer_blocks):
+    #     x_freq = transformer_encoder(x_freq, head_size, num_heads, ff_dim, dropout)
     
     # Cross-Domain Attention 적용
     # 시간 도메인에서 주파수 도메인에 주의
@@ -988,5 +988,101 @@ def Transformer_COMBDAE_with_CrossDomainAttention(signal_size=sigLen, head_size=
     predictions = Conv1DTranspose(x8, filters=1, kernel_size=ks, activation='linear', strides=2, padding='same')
     
     # 모델 정의
+    model = Model(inputs=[time_input, freq_input], outputs=predictions)
+    return model
+
+import tensorflow as tf
+
+# Frequency Band Encoding 함수
+def frequency_band_encoding(frequency_input, num_bands):
+    """
+    주파수 대역을 num_bands로 나누고, 각 대역에 대해 가중치를 적용하는 인코딩 방법
+    """
+    bands = tf.split(frequency_input, num_bands, axis=1)  # 주파수 대역을 num_bands 개수로 나눔
+    encoded_bands = []
+    for band in bands:
+        # 각 대역별 가중치 (학습 가능한 가중치)
+        weight = tf.Variable(1.0, dtype=tf.float32)
+        encoded_bands.append(band * weight)
+    
+    return tf.concat(encoded_bands, axis=1)
+
+def frequency_branch_with_band_encoding(input_tensor, filters, num_bands):
+    """
+    Frequency Branch에 Frequency Band Encoding을 적용한 버전
+    """
+    x = layers.Conv1D(filters=filters, kernel_size=13, activation='relu', padding='same', strides=2)(input_tensor)
+    x = layers.BatchNormalization()(x)
+    x = layers.Conv1D(filters=filters * 2, kernel_size=13, activation='relu', padding='same', strides=2)(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Conv1D(filters=filters * 4, kernel_size=13, activation='relu', padding='same', strides=2)(x)
+    x = layers.BatchNormalization()(x)
+    
+    # Frequency Band Encoding 적용
+    x = frequency_band_encoding(x, num_bands)
+    
+    return x
+
+def Transformer_COMBDAE_with_band_encoding(signal_size=sigLen, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0, num_bands=4):
+    input_shape = (signal_size, 1)
+    
+    # Time domain 입력
+    time_input = Input(shape=input_shape)
+    
+    # 주파수 도메인 입력
+    freq_input = Input(shape=input_shape)
+
+    # Time domain 처리 (원래 코드 그대로 유지)
+    x0 = Conv1D(filters=16, input_shape=(input_shape, 1), kernel_size=ks, activation='linear', strides=2, padding='same')(time_input)
+    x0 = AddGatedNoise()(x0)
+    x0 = layers.Activation('sigmoid')(x0)
+    x0_ = Conv1D(filters=16, input_shape=(input_shape, 1), kernel_size=ks, activation=None, strides=2, padding='same')(time_input)
+    xmul0 = Multiply()([x0, x0_])
+    xmul0 = BatchNormalization()(xmul0)
+    
+    x1 = Conv1D(filters=32, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul0)
+    x1 = AddGatedNoise()(x1)
+    x1 = layers.Activation('sigmoid')(x1)
+    x1_ = Conv1D(filters=32, kernel_size=ks, activation=None, strides=2, padding='same')(xmul0)
+    xmul1 = Multiply()([x1, x1_])
+    xmul1 = BatchNormalization()(xmul1)
+    
+    x2 = Conv1D(filters=64, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul1)
+    x2 = AddGatedNoise()(x2)
+    x2 = layers.Activation('sigmoid')(x2)
+    x2_ = Conv1D(filters=64, kernel_size=ks, activation='elu', strides=2, padding='same')(xmul1)
+    xmul2 = Multiply()([x2, x2_])
+    xmul2 = BatchNormalization()(xmul2)
+
+    # Frequency domain 처리에 Frequency Band Encoding 적용
+    f2 = frequency_branch_with_band_encoding(freq_input, 16, num_bands)
+
+    # Time domain과 Frequency domain 결합
+    combined = layers.Concatenate()([xmul2, f2])
+    
+    # Time domain에 Positional Encoding 적용 (주파수 도메인에는 Positional Encoding 생략)
+    position_embed = TFPositionalEncoding1D(signal_size)
+    x3 = combined + position_embed(combined)
+    
+    # Transformer Encoder 적용
+    for _ in range(num_transformer_blocks):
+        x3 = transformer_encoder(x3, head_size, num_heads, ff_dim, dropout)
+    
+    # Decoder 부분
+    x4 = Conv1DTranspose(input_tensor=x3, filters=64, kernel_size=ks, activation='elu', strides=1, padding='same')
+    x4 = x4 + xmul2
+    x4 = BatchNormalization()(x4)
+
+    x5 = Conv1DTranspose(input_tensor=x4, filters=32, kernel_size=ks, activation='elu', strides=2, padding='same')
+    x5 = x5 + xmul1
+    x5 = BatchNormalization()(x5)
+
+    x6 = Conv1DTranspose(input_tensor=x5, filters=16, kernel_size=ks, activation='elu', strides=2, padding='same')
+    x6 = x6 + xmul0
+    x6 = BatchNormalization()(x6)
+
+    x7 = BatchNormalization()(x6)
+    predictions = Conv1DTranspose(input_tensor=x7, filters=1, kernel_size=ks, activation='linear', strides=2, padding='same')
+
     model = Model(inputs=[time_input, freq_input], outputs=predictions)
     return model

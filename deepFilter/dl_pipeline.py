@@ -32,7 +32,7 @@ def train_dl(Dataset, experiment):
 
     print('Deep Learning pipeline: Training the model for exp ' + str(experiment))
     
-    if experiment == 'Transformer_COMBDAE_with_band_encoding':
+    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS']:
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
 
         # F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
@@ -54,14 +54,14 @@ def train_dl(Dataset, experiment):
     elif experiment == 'Transformer_COMBDAE':
         model = Transformer_COMBDAE()
         model_label = 'Transformer_COMBDAE'
-    elif experiment == 'Transformer_COMBDAE_with_band_encoding':
+    elif experiment == 'Transformer_COMBDAE_FreTS':
         model = Transformer_COMBDAE_with_band_encoding()
-        model_label = 'Transformer_COMBDAE_with_band_encoding'
+        model_label = 'Transformer_COMBDAE_FreTS'
     print('\n ' + model_label + '\n ')
 
     model.summary()
 
-    epochs = int(1e2)  # 100000
+    epochs = int(1e3)  # 100000
     # epochs = 100
     batch_size = 128
     lr = 1e-3
@@ -110,7 +110,7 @@ def train_dl(Dataset, experiment):
     early_stop = EarlyStopping(monitor="val_loss",  
                             min_delta=0.0001,       # 개선 판단을 위한 최소 변화량
                             mode='min',             # val_loss 최소화를 목표로 함
-                            patience=20,            # patience를 50에서 20으로 줄여 더 빠른 조기 종료
+                            patience=200,            # patience를 50에서 20으로 줄여 더 빠른 조기 종료
                             verbose=1)
     tb_log_dir = './runs_' + current_date +'/' + model_label
     # 디렉토리가 존재하지 않으면 생성
@@ -126,7 +126,8 @@ def train_dl(Dataset, experiment):
     # tensorboard --logdir=./runs_new
 
     # GPU
-    if experiment == 'Transformer_COMBDAE_with_band_encoding':
+    # if experiment == 'Transformer_COMBDAE_FreTS':
+    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS']:
         model.fit(x=[X_train, F_train_x], y=y_train,
                 validation_data=([X_val, F_val_x], y_val),
                 batch_size=batch_size,
@@ -154,7 +155,7 @@ def test_dl(Dataset, experiment):
 
     print('Deep Learning pipeline: Testing the model')
 
-    if experiment == 'Transformer_COMBDAE_with_band_encoding':
+    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS']:
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
 
         # F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
@@ -178,9 +179,9 @@ def test_dl(Dataset, experiment):
     elif experiment == 'Transformer_COMBDAE':
         model = Transformer_COMBDAE()
         model_label = 'Transformer_COMBDAE'
-    elif experiment == 'Transformer_COMBDAE_with_band_encoding':
+    elif experiment == 'Transformer_COMBDAE_FreTS':
         model = Transformer_COMBDAE_with_band_encoding()
-        model_label = 'Transformer_COMBDAE_with_band_encoding'
+        model_label = 'Transformer_COMBDAE_FreTS'
     print('\n ' + model_label + '\n ')
 
     model.summary()
@@ -208,7 +209,7 @@ def test_dl(Dataset, experiment):
     # load weights
     model.load_weights(model_filepath)
     
-    if experiment == 'Transformer_COMBDAE_with_band_encoding':
+    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS']:
         # Test score
         y_pred = model.predict([X_test, F_test_x], batch_size=batch_size, verbose=1)
 

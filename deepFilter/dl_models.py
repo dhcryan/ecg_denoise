@@ -548,7 +548,7 @@ def transformer_encoder(inputs,head_size,num_heads,ff_dim,dropout=0):
 
     # Feed Forward Part
     x = layers.LayerNormalization(epsilon=1e-6)(res)
-    x = layers.Conv1D(filters=ff_dim, kernel_size=1, activation="relu")(x)  ##之前用的sigmoid, 可以试下gelu
+    x = layers.Conv1D(filters=ff_dim, kernel_size=1, activation="relu")(x) 
     x = layers.Dropout(dropout)(x)
     x = layers.Conv1D(filters=inputs.shape[-1], kernel_size=1)(x)
     return x + res
@@ -1083,6 +1083,109 @@ def Transformer_COMBDAE_with_band_encoding(signal_size=sigLen, head_size=64, num
 
     x7 = BatchNormalization()(x6)
     predictions = Conv1DTranspose(input_tensor=x7, filters=1, kernel_size=ks, activation='linear', strides=2, padding='same')
+
+    model = Model(inputs=[time_input, freq_input], outputs=predictions)
+    return model
+
+import tensorflow as tf
+from tensorflow.keras import layers, Model, Input
+
+# FreMLP 함수: 주파수 도메인에서 MLP를 적용하여 실수 및 허수 성분을 학습
+def FreMLP(x, r, i, rb, ib, embed_size):
+    o_real = tf.nn.relu(
+        tf.einsum('...ij,jk->...ik', x.real, r) - tf.einsum('...ij,jk->...ik', x.imag, i) + rb
+    )
+    o_imag = tf.nn.relu(
+        tf.einsum('...ij,jk->...ik', x.imag, r) + tf.einsum('...ij,jk->...ik', x.real, i) + ib
+    )
+    
+    y = tf.stack([o_real, o_imag], axis=-1)  # 실수와 허수를 결합
+    y = tf.view_as_complex(y)  # 복소수로 변환
+    return y
+
+# MLP_temporal_frets: 주파수 도메인에서 시간 정보를 학습하는 함수 (FreMLP 사용)
+def MLP_temporal_frets(x, r2, i2, rb2, ib2, seq_len, embed_size):
+    x = tf.signal.rfft(x)  # FFT on time dimension
+    x = FreMLP(x, r2, i2, rb2, ib2, embed_size)  # FreMLP 적용
+    y = tf.signal.irfft(x, fft_length=[seq_len])  # Inverse FFT
+    return y
+
+# # 주파수 도메인 처리 함수 (Conv1D 사용)
+# def frequency_branch(input_tensor, filters):
+#     """
+#     주파수 도메인에서 Conv1D를 이용하여 특징 추출
+#     """
+#     x = layers.Conv1D(filters=filters, kernel_size=13, activation='relu', padding='same', strides=2)(input_tensor)
+#     x = layers.BatchNormalization()(x)
+#     x = layers.Conv1D(filters=filters*2, kernel_size=13, activation='relu', padding='same', strides=2)(x)
+#     x = layers.BatchNormalization()(x)
+#     return x
+
+# Transformer_COMBDAE 모델 (시간 도메인 MLP + Conv, 주파수 도메인 Conv, 이후 Transformer)
+def Transformer_COMBDAE_FreTS(signal_size=sigLen, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0):
+    input_shape = (signal_size, 1)
+    
+    # 시간 도메인 입력
+    time_input = Input(shape=input_shape)
+    
+    # 주파수 도메인 입력
+    freq_input = Input(shape=input_shape)
+
+    # 시간 도메인: MLP_temporal_frets 적용
+    r2, i2 = tf.random.normal([128, 128]), tf.random.normal([128, 128])
+    rb2, ib2 = tf.random.normal([128]), tf.random.normal([128])
+    time_features = MLP_temporal_frets(time_input, r2, i2, rb2, ib2, signal_size, 128)
+    
+    # 시간 도메인: Conv1D 적용
+    x0 = Conv1D(filters=16, kernel_size=13, activation='linear', strides=2, padding='same')(time_features)
+    x0 = AddGatedNoise()(x0)
+    x0 = layers.Activation('sigmoid')(x0)
+
+    x0_ = Conv1D(filters=16, kernel_size=13, activation=None, strides=2, padding='same')(time_features)
+    xmul0 = Multiply()([x0, x0_])
+    xmul0 = BatchNormalization()(xmul0)
+
+    x1 = Conv1D(filters=32, kernel_size=13, activation='linear', strides=2, padding='same')(xmul0)
+    x1 = AddGatedNoise()(x1)
+    x1 = layers.Activation('sigmoid')(x1)
+
+    x1_ = Conv1D(filters=32, kernel_size=13, activation=None, strides=2, padding='same')(xmul0)
+    xmul1 = Multiply()([x1, x1_])
+    xmul1 = BatchNormalization()(xmul1)
+
+    x2 = Conv1D(filters=64, kernel_size=13, activation='linear', strides=2, padding='same')(xmul1)
+    x2 = AddGatedNoise()(x2)
+    x2 = layers.Activation('sigmoid')(x2)
+
+    x2_ = Conv1D(filters=64, kernel_size=13, activation='elu', strides=2, padding='same')(xmul1)
+    xmul2 = Multiply()([x2, x2_])
+    xmul2 = BatchNormalization()(xmul2)
+
+    # 주파수 도메인: Conv1D 적용
+    f2 = frequency_branch(freq_input, 16)
+
+    # 시간 및 주파수 도메인 결합
+    combined = layers.Concatenate()([xmul2, f2])
+
+    # Transformer 처리
+    position_embed = TFPositionalEncoding1D(signal_size)
+    x3 = combined + position_embed(combined)
+    
+    for _ in range(num_transformer_blocks):
+        x3 = transformer_encoder(x3, head_size, num_heads, ff_dim, dropout)
+    
+    # 디코더 처리
+    x5 = Conv1DTranspose(input_tensor=x3, filters=64, kernel_size=13, activation='elu', strides=1, padding='same')
+    x5 = BatchNormalization()(x5)
+    
+    x6 = Conv1DTranspose(input_tensor=x5, filters=32, kernel_size=13, activation='elu', strides=2, padding='same')
+    x6 = BatchNormalization()(x6)
+    
+    x7 = Conv1DTranspose(input_tensor=x6, filters=16, kernel_size=13, activation='elu', strides=2, padding='same')
+    x8 = BatchNormalization()(x7)
+    
+    # 최종 출력
+    predictions = Conv1DTranspose(input_tensor=x8, filters=1, kernel_size=13, activation='linear', strides=2, padding='same')
 
     model = Model(inputs=[time_input, freq_input], outputs=predictions)
     return model

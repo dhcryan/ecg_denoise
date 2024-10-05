@@ -19,10 +19,9 @@ if __name__ == "__main__":
     #                   'Vanilla L',
     #                   'Vanilla NL',
     #                   'Multibranch LANL',
-    #                   'Multibranch LANLD',
-    #                   'Transformer_DAE',
-    #                   'Transformer_COMBDAE', 'Transformer_COMBDAE_with_CrossDomainAttention']
-    dl_experiments = ['Transformer_DAE','Transformer_COMBDAE','Transformer_COMBDAE_FreTS']
+    #                   'Multibranch LANLD']
+    # dl_experiments = ['Transformer_DAE','Transformer_COMBDAE','Transformer_COMBDAE_FreTS']
+    dl_experiments = ['Transformer_COMBDAE_FreTS']
 
     train_time_list = []
     test_time_list = []

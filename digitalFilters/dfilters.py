@@ -218,34 +218,60 @@ def IIR_test_Dataset(Dataset):
     return [X_test, y_test, y_filter_out]
 
 
-if __name__ == "__main__":
-    # signal for demonstration.
-    ecgy = sio.loadmat('ecgbeat.mat')
-    signal = ecgy['ecgy']
-    signal = list(signal[:,0])
+# if __name__ == "__main__":
+#     # signal for demonstration.
+#     ecgy = sio.loadmat('ecgbeat.mat')
+#     signal = ecgy['ecgy']
+#     signal = list(signal[:,0])
 
-    ## parameters
-    Fs = 360
-    Fc = 0.67
-    factor = 2
+#     ## parameters
+#     Fs = 360
+#     Fc = 0.67
+#     factor = 2
 
-    #ECG_Clean,N = FIRRemoveBL(signal,Fs,Fc,factor)
+#     #ECG_Clean,N = FIRRemoveBL(signal,Fs,Fc,factor)
 
-    ECG_Clean = IIRRemoveBL(signal,Fs, Fc)
+#     ECG_Clean = IIRRemoveBL(signal,Fs, Fc)
 
-    plt.figure()
-    plt.plot(signal[0:len(ecgy['ecgy'])])
-    plt.plot(ECG_Clean)
-    plt.show()
-    plt.figure()
+#     plt.figure()
+#     plt.plot(signal[0:len(ecgy['ecgy'])])
+#     plt.plot(ECG_Clean)
+#     plt.show()
+#     plt.figure()
+# # Classical Filters
 
+# # FIR
+# print('Running FIR fiter on the test set. This will take a while (2h)...')
+# start_test = datetime.now()
+# [X_test_f, y_test_f, y_filter] = FIR_test_Dataset(Dataset)
+# end_test = datetime.now()
+# train_time_list.append(0)
+# test_time_list.append(end_test - start_test)
 
+# test_results_FIR = [X_test_f, y_test_f, y_filter]
 
+# # Save FIR filter results
+# with open('test_results_FIR.pkl', 'wb') as output:  # Overwrites any existing file.
+#     pickle.dump(test_results_FIR, output)
+# print('Results from experiment FIR filter saved')
 
+# # IIR
+# print('Running IIR fiter on the test set. This will take a while (25 mins)...')
+# start_test = datetime.now()
+# [X_test_f, y_test_f, y_filter] = IIR_test_Dataset(Dataset)
+# end_test = datetime.now()
+# train_time_list.append(0)
+# test_time_list.append(end_test - start_test)
 
+# test_results_IIR = [X_test_f, y_test_f, y_filter]
 
+# # Save IIR filter results
+# with open('test_results_IIR.pkl', 'wb') as output:  # Overwrites any existing file.
+#     pickle.dump(test_results_IIR, output)
+# print('Results from experiment IIR filter saved')
 
-
-
-
-
+# # Saving timing list
+# timing = [train_time_list, test_time_list]
+# with open('timing.pkl', 'wb') as output:  # Overwrites any existing file.
+#     pickle.dump(timing, output)
+# print('Timing saved')

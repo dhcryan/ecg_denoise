@@ -47,16 +47,49 @@ def train_dl(Dataset, experiment):
     # ==================
     # LOAD THE DL MODEL
     # ==================
+    if experiment == 'FCN-DAE':
+        # FCN_DAE
+        model = FCN_DAE()
+        model_label = 'FCN_DAE'
+
+    if experiment == 'DRNN':
+        # DRNN
+        model = DRRN_denoising()
+        model_label = 'DRNN'
+
+    if experiment == 'Vanilla L':
+        # Vanilla CNN linear
+        model = deep_filter_vanilla_linear()
+        model_label = 'Vanilla_L'
+
+    if experiment == 'Vanilla NL':
+        # Vanilla CNN non linear
+        model = deep_filter_vanilla_Nlinear()
+        model_label = 'Vanilla_NL'
+
+    if experiment == 'Multibranch LANL':
+        # Multibranch linear and non linear
+        model = deep_filter_I_LANL()
+        model_label = 'Multibranch_LANL'
+
+    if experiment == 'Multibranch LANLD':
+        # Inception-like linear and non linear dilated
+        model = deep_filter_model_I_LANL_dilated()
+        model_label = 'Multibranch_LANLD'
+        
     if experiment == 'Transformer_DAE':
         # Transformer_FDAE
         model = Transformer_DAE()
         model_label = 'Transformer_DAE'
-    elif experiment == 'Transformer_COMBDAE':
+        
+    if experiment == 'Transformer_COMBDAE':
         model = Transformer_COMBDAE()
         model_label = 'Transformer_COMBDAE'
-    elif experiment == 'Transformer_COMBDAE_FreTS':
-        model = Transformer_COMBDAE_with_band_encoding()
+        
+    if experiment == 'Transformer_COMBDAE_FreTS':
+        model = Transformer_COMBDAE_FreTS()
         model_label = 'Transformer_COMBDAE_FreTS'
+    
     print('\n ' + model_label + '\n ')
 
     model.summary()
@@ -172,15 +205,47 @@ def test_dl(Dataset, experiment):
     # ==================
     # LOAD THE DL MODEL
     # ==================
+    if experiment == 'FCN-DAE':
+        # FCN_DAE
+        model = FCN_DAE()
+        model_label = 'FCN_DAE'
+
+    if experiment == 'DRNN':
+        # DRNN
+        model = DRRN_denoising()
+        model_label = 'DRNN'
+
+    if experiment == 'Vanilla L':
+        # Vanilla CNN linear
+        model = deep_filter_vanilla_linear()
+        model_label = 'Vanilla_L'
+
+    if experiment == 'Vanilla NL':
+        # Vanilla CNN non linear
+        model = deep_filter_vanilla_Nlinear()
+        model_label = 'Vanilla_NL'
+
+    if experiment == 'Multibranch LANL':
+        # Multibranch linear and non linear
+        model = deep_filter_I_LANL()
+        model_label = 'Multibranch_LANL'
+
+    if experiment == 'Multibranch LANLD':
+        # Inception-like linear and non linear dilated
+        model = deep_filter_model_I_LANL_dilated()
+        model_label = 'Multibranch_LANLD'
+        
     if experiment == 'Transformer_DAE':
         # Transformer_FDAE
         model = Transformer_DAE()
         model_label = 'Transformer_DAE'
-    elif experiment == 'Transformer_COMBDAE':
+        
+    if experiment == 'Transformer_COMBDAE':
         model = Transformer_COMBDAE()
         model_label = 'Transformer_COMBDAE'
-    elif experiment == 'Transformer_COMBDAE_FreTS':
-        model = Transformer_COMBDAE_with_band_encoding()
+        
+    if experiment == 'Transformer_COMBDAE_FreTS':
+        model = Transformer_COMBDAE_FreTS()
         model_label = 'Transformer_COMBDAE_FreTS'
     print('\n ' + model_label + '\n ')
 

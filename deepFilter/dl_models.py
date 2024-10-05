@@ -513,9 +513,6 @@ def DRRN_denoising():
 
     return model
 
-
-
-
 sigLen = 512
 def Conv1DTranspose(input_tensor, filters, kernel_size, strides=2, activation='relu', padding='same'):
     """
@@ -991,7 +988,6 @@ def Transformer_COMBDAE_with_CrossDomainAttention(signal_size=sigLen, head_size=
     model = Model(inputs=[time_input, freq_input], outputs=predictions)
     return model
 
-import tensorflow as tf
 
 # Frequency Band Encoding 함수
 def frequency_band_encoding(frequency_input, num_bands):
@@ -1109,17 +1105,6 @@ def MLP_temporal_frets(x, r2, i2, rb2, ib2, seq_len, embed_size):
     x = FreMLP(x, r2, i2, rb2, ib2, embed_size)  # FreMLP 적용
     y = tf.signal.irfft(x, fft_length=[seq_len])  # Inverse FFT
     return y
-
-# # 주파수 도메인 처리 함수 (Conv1D 사용)
-# def frequency_branch(input_tensor, filters):
-#     """
-#     주파수 도메인에서 Conv1D를 이용하여 특징 추출
-#     """
-#     x = layers.Conv1D(filters=filters, kernel_size=13, activation='relu', padding='same', strides=2)(input_tensor)
-#     x = layers.BatchNormalization()(x)
-#     x = layers.Conv1D(filters=filters*2, kernel_size=13, activation='relu', padding='same', strides=2)(x)
-#     x = layers.BatchNormalization()(x)
-#     return x
 
 # Transformer_COMBDAE 모델 (시간 도메인 MLP + Conv, 주파수 도메인 Conv, 이후 Transformer)
 def Transformer_COMBDAE_FreTS(signal_size=sigLen, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0):

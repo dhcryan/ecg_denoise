@@ -733,6 +733,7 @@ class TFPositionalEncoding1D(tf.keras.layers.Layer):
 ks = 13   #orig 13
 ks1 = 7
 
+
 def frequency_branch(input_tensor, filters):
     x = layers.Conv1D(filters=filters, kernel_size=13, activation='relu', padding='same', strides=2)(input_tensor)
     x = layers.BatchNormalization()(x)
@@ -741,6 +742,40 @@ def frequency_branch(input_tensor, filters):
     x = layers.Conv1D(filters=filters*4, kernel_size=13, activation='relu', padding='same', strides=2)(x)
     x = layers.BatchNormalization()(x)
     return x
+
+def frequency_branch(input_tensor, filters, kernel_size=13):
+    # 첫 번째 Conv1D 및 Gated Noise 추가
+    x0 = Conv1D(filters=filters, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(input_tensor)
+    # x0 = AddGatedNoise()(x0)
+    x0 = Activation('sigmoid')(x0)
+
+    x0_ = Conv1D(filters=filters, kernel_size=kernel_size, activation=None, strides=2, padding='same')(input_tensor)
+    xmul0 = Multiply()([x0, x0_])
+    xmul0 = BatchNormalization()(xmul0)
+
+    # 두 번째 Conv1D 및 Gated Noise 추가
+    x1 = Conv1D(filters=filters * 2, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(xmul0)
+    # x1 = AddGatedNoise()(x1)
+    x1 = Activation('sigmoid')(x1)
+
+    x1_ = Conv1D(filters=filters * 2, kernel_size=kernel_size, activation=None, strides=2, padding='same')(xmul0)
+    xmul1 = Multiply()([x1, x1_])
+    xmul1 = BatchNormalization()(xmul1)
+
+    # 세 번째 Conv1D 및 Gated Noise 추가
+    x2 = Conv1D(filters=filters * 4, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(xmul1)
+    # x2 = AddGatedNoise()(x2)
+    x2 = Activation('sigmoid')(x2)
+
+    x2_ = Conv1D(filters=filters * 4, kernel_size=kernel_size, activation='elu', strides=2, padding='same')(xmul1)
+    xmul2 = Multiply()([x2, x2_])
+    xmul2 = BatchNormalization()(xmul2)
+
+    return xmul2
+
+
+
+
     
 def Transformer_COMBDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_transformer_blocks=6, dropout=0):   ###paper 1 model
     input_shape = (signal_size, 1)
@@ -859,6 +894,7 @@ def Transformer_COMBDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,
 
     model = Model(inputs=[time_input, freq_input], outputs=predictions)
     return model
+
 # Frequency Band Encoding 함수
 def frequency_band_encoding(frequency_input, num_bands):
     """
@@ -1043,4 +1079,41 @@ def Transformer_COMBDAE_FreTS(signal_size=sigLen, head_size=64, num_heads=8, ff_
     predictions = Conv1DTranspose(input_tensor=x8, filters=1, kernel_size=13, activation='linear', strides=2, padding='same')
 
     model = Model(inputs=[time_input, freq_input], outputs=predictions)
+    return model
+
+def Transformer_COMBDAE(signal_size=512, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0):
+    input_shape = (signal_size, 1)
+    time_input = Input(shape=input_shape)
+    freq_input = Input(shape=input_shape)
+    
+    # 1. Time domain 처리 (먼저 시간적 패턴을 추출)
+    time_branch = time_domain_branch(time_input, filters=16)
+    
+    # 2. MLP_temporal을 time_branch에 적용 (주파수-시간 변환)
+    mlp_temporal = MLP_temporal(seq_length=signal_size)
+    time_branch = mlp_temporal(time_branch)
+    
+    # Frequency domain 처리
+    freq_branch = frequency_branch(freq_input, filters=16)
+    
+    # Time과 Frequency branch 결합
+    combined = Concatenate()([time_branch, freq_branch])
+    
+    # Transformer 인코더 블록
+    for _ in range(num_transformer_blocks):
+        combined = transformer_encoder(combined, head_size, num_heads, ff_dim, dropout)
+
+    # 디코더
+    x5 = Conv1D(filters=64, kernel_size=13, activation='elu', strides=1, padding='same')(combined)
+    x5 = BatchNormalization()(x5)
+
+    x6 = Conv1D(filters=32, kernel_size=13, activation='elu', strides=2, padding='same')(x5)
+    x6 = BatchNormalization()(x6)
+
+    x7 = Conv1D(filters=16, kernel_size=13, activation='elu', strides=2, padding='same')(x6)
+    x7 = BatchNormalization()(x7)
+
+    predictions = Conv1D(filters=1, kernel_size=13, activation='linear', strides=2, padding='same')(x7)
+
+    model = nn.Module(inputs=[time_input, freq_input], outputs=predictions)
     return model

@@ -21,7 +21,7 @@ if __name__ == "__main__":
     #                   'Multibranch LANL',
     #                   'Multibranch LANLD']
     # dl_experiments = ['Transformer_DAE','Transformer_COMBDAE','Transformer_COMBDAE_FreTS']
-    dl_experiments = ['Transformer_COMBDAE_FreTS']
+    dl_experiments = ['Transformer_COMBDAE']
 
     train_time_list = []
     test_time_list = []

@@ -285,12 +285,123 @@ def visualize_signals(y_train, X_train, fs, num_samples=3, signal_length=512, sa
             save_dir=save_dir, 
             filename=f'spectrogram_noisy_{idx}.png'
         )
+############################################################################################################
+def generate_hboxplot(np_data, description, ylabel, log, save_dir, filename, set_x_axis_size=None):
+    # Process the results and store in Pandas DataFrame
+    ensure_directory(save_dir)  # 디렉토리 생성
+    col = description
+    loss_val_np = np.rot90(np_data)
+    pd_df = pd.DataFrame.from_records(loss_val_np, columns=col)
+
+    # Set up the matplotlib figure
+    sns.set(style="whitegrid")
+    f, ax = plt.subplots(figsize=(15, 6))
+
+    ax = sns.boxplot(data=pd_df, orient="h", width=0.4)  # 가로로 누운 boxplot
+
+    if log:
+        ax.set_xscale("log")
+
+    if set_x_axis_size is not None:
+        ax.set_xlim(set_x_axis_size)
+
+    ax.set(ylabel='Models/Methods', xlabel=ylabel)
+    ax = sns.despine(left=True, bottom=True)
+
+    # Save plot to file
+    filepath = os.path.join(save_dir, filename)
+    plt.savefig(filepath)
+    plt.close()
+    print(f"Saved: {filepath}")
 
 
+def generate_violinplots(np_data, description, ylabel, log, save_dir, filename, set_x_axis_size=None):
+    # Process the results and store in Pandas DataFrame
+    ensure_directory(save_dir)  # 디렉토리 생성
+    col = description
+    loss_val_np = np.rot90(np_data)
+    pd_df = pd.DataFrame.from_records(loss_val_np, columns=col)
+
+    # Set up the matplotlib figure
+    f, ax = plt.subplots(figsize=(15, 6))
+    sns.set(style="whitegrid")
+    ax = sns.violinplot(data=pd_df, palette="Set3", bw=.2, cut=1, linewidth=1, orient="h")  # 가로로 누운 violinplot
+
+    if log:
+        ax.set_xscale("log")
+
+    if set_x_axis_size is not None:
+        ax.set_xlim(set_x_axis_size)
+
+    ax.set(xlabel='Models/Methods', ylabel=ylabel)
+    ax = sns.despine(left=True, bottom=True)
+
+    # Save plot to file
+    filepath = os.path.join(save_dir, filename)
+    plt.savefig(filepath)
+    plt.close()
+    print(f"Saved: {filepath}")
+
+
+def generate_barplot(np_data, description, ylabel, log, save_dir, filename, set_x_axis_size=None):
+    # Process the results and store in Pandas DataFrame
+    ensure_directory(save_dir)  # 디렉토리 생성
+    col = description
+    loss_val_np = np.rot90(np_data)
+    pd_df = pd.DataFrame.from_records(loss_val_np, columns=col)
+
+    # Set up the matplotlib figure
+    f, ax = plt.subplots(figsize=(15, 6))
+    sns.set(style="whitegrid")
+    ax = sns.barplot(data=pd_df, orient="h")  # 가로로 누운 barplot
+
+    if log:
+        ax.set_xscale("log")
+
+    if set_x_axis_size is not None:
+        ax.set_xlim(set_x_axis_size)
+
+    ax.set(xlabel='Models/Methods', ylabel=ylabel)
+    ax = sns.despine(left=True, bottom=True)
+
+    # Save plot to file
+    filepath = os.path.join(save_dir, filename)
+    plt.savefig(filepath)
+    plt.close()
+    print(f"Saved: {filepath}")
+
+def generate_boxplot(np_data, description, ylabel, log, save_dir, filename, set_x_axis_size=None):
+    # Process the results and store in Pandas DataFrame
+    ensure_directory(save_dir)  # 디렉토리 생성
+    col = description
+    loss_val_np = np.rot90(np_data)
+    pd_df = pd.DataFrame.from_records(loss_val_np, columns=col)
+
+    # Set up the matplotlib figure
+    f, ax = plt.subplots(figsize=(15, 6))
+    sns.set(style="whitegrid")
+    ax = sns.boxplot(data=pd_df, orient="h")  # 가로로 누운 boxplot
+
+    if log:
+        ax.set_xscale("log")
+
+    if set_x_axis_size is not None:
+        ax.set_xlim(set_x_axis_size)
+
+    ax.set(xlabel='Models/Methods', ylabel=ylabel)
+    ax = sns.despine(left=True, bottom=True)
+
+    # Save plot to file
+    filepath = os.path.join(save_dir, filename)
+    plt.savefig(filepath)
+    plt.close()
+    print(f"Saved: {filepath}")
+
+############################################################################################################
 # Function to visualize original and noisy beats separately
-def plot_ecg_comparison_separate(X_data, y_data, indices, title, num_beats=5):
+def plot_ecg_comparison_separate(X_data, y_data, indices, title, num_beats=5, save_dir='visualizations'):
     """
-    Visualizes the original and noisy ECG beats separately.
+    Visualizes the original and noisy ECG beats separately and saves the plot.
     
     Parameters:
     X_data: Noisy ECG beats (X_train or X_test)
@@ -298,12 +409,16 @@ def plot_ecg_comparison_separate(X_data, y_data, indices, title, num_beats=5):
     indices: Valid indices for the beats
     title: Title for the plot
     num_beats: Number of beats to visualize
+    save_dir: Directory to save the visualization
     """
+    ensure_directory(save_dir)  # 디렉토리 생성
+
     # Randomly select a subset of valid indices for visualization
     if len(indices) < num_beats:
         num_beats = len(indices)  # Ensure we don't sample more than available valid beats
     selected_indices = random.sample(indices, num_beats)
 
+    # Create a figure
     plt.figure(figsize=(15, num_beats * 4))
 
     for i, idx in enumerate(selected_indices):
@@ -320,163 +435,120 @@ def plot_ecg_comparison_separate(X_data, y_data, indices, title, num_beats=5):
         plt.legend()
 
     plt.tight_layout()
-    plt.show()
 
+    # Save the plot to the file
+    filename = f"{title.replace(' ', '_')}_comparison.png"
+    filepath = os.path.join(save_dir, filename)
+    plt.savefig(filepath)
+    plt.close()
+    
+    print(f"Saved: {filepath}")
 
-# # Visualize the comparison for training data
-# plot_ecg_comparison_separate(X_train, y_train, valid_train_indices, "Training Set", num_beats=5)
+def ecg_view(ecg, ecg_blw, ecg_dl, ecg_f, noise_index=None, signal_name=None, beat_no=None, save_dir='view'):
+    """
+    ECG 신호와 필터링된 신호들을 시각화하고, 노이즈 조합 정보를 제목에 표시하며 저장합니다.
+    
+    Parameters:
+    ecg: 원본 ECG 신호
+    ecg_blw: 노이즈가 포함된 ECG 신호 (Baseline Wander 포함)
+    ecg_dl: DL로 필터링된 ECG 신호
+    ecg_f: IIR 필터로 필터링된 ECG 신호
+    noise_index: 노이즈 인덱스 (Optional)
+    signal_name: 시각화할 신호의 이름 (Optional)
+    beat_no: 시각화할 비트 번호 (Optional)
+    save_dir: 시각화한 이미지를 저장할 디렉토리 (Optional)
+    """
+    ensure_directory(save_dir)  # 디렉토리 생성
 
-# # Visualize the comparison for testing data
-# plot_ecg_comparison_separate(X_test, y_test, valid_test_indices, "Testing Set", num_beats=5)
-
-def generate_violinplots(np_data, description, ylabel, log):
-    # Process the results and store in Panda objects
-
-    col = description
-    loss_val_np = np.rot90(np_data)
-    pd_df = pd.DataFrame.from_records(loss_val_np, columns=col)
-
-    # Set up the matplotlib figure
-
-    f, ax = plt.subplots()
-
-    sns.set(style="whitegrid")
-
-    ax = sns.violinplot(data=pd_df, palette="Set3", bw=.2, cut=1, linewidth=1)
-
-    if log:
-        ax.set_yscale("log")
-
-    ax.set(xlabel='Models/Methods', ylabel=ylabel)
-    ax = sns.despine(left=True, bottom=True)
-
-    plt.show()
-
-    #plt.savefig(store_folder + 'violinplot_fco' + info + description + '.png')
-
-
-def generate_barplot(np_data, description, ylabel, log):
-    # Process the results and store in Panda objects
-    col = description
-    loss_val_np = np.rot90(np_data)
-    pd_df = pd.DataFrame.from_records(loss_val_np, columns=col)
-
-    # Set up the matplotlib figure
-
-    f, ax = plt.subplots()
-
-    sns.set(style="whitegrid")
-
-    ax = sns.barplot(data=pd_df)
-
-    if log:
-        ax.set_yscale("log")
-
-    ax.set(xlabel='Models/Methods', ylabel=ylabel)
-    ax = sns.despine(left=True, bottom=True)
-
-    plt.show()
-
-    #plt.savefig(store_folder + 'violinplot_fco' + info + description + '.png')
-
-
-def generate_boxplot(np_data, description, ylabel, log):
-    # Process the results and store in Panda objects
-    col = description
-    loss_val_np = np.rot90(np_data)
-    pd_df = pd.DataFrame.from_records(loss_val_np, columns=col)
-
-    # Set up the matplotlib figure
-
-    f, ax = plt.subplots()
-
-    sns.set(style="whitegrid")
-
-    ax = sns.boxplot(data=pd_df)
-
-    if log:
-        ax.set_yscale("log")
-
-    ax.set(xlabel='Models/Methods', ylabel=ylabel)
-    ax = sns.despine(left=True, bottom=True)
-
-    plt.show()
-
-    #plt.savefig(store_folder + 'violinplot_fco' + info + description + '.png')
-
-
-def generate_hboxplot(np_data, description, ylabel, log, set_x_axis_size=None):
-    # Process the results and store in Panda objects
-    col = description
-    loss_val_np = np.rot90(np_data)
-
-    pd_df = pd.DataFrame.from_records(loss_val_np, columns=col)
-
-    # Set up the matplotlib figure
-    sns.set(style="whitegrid")
-
-    f, ax = plt.subplots(figsize=(15, 6))
-
-    ax = sns.boxplot(data=pd_df, orient="h", width=0.4)
-
-    if log:
-        ax.set_xscale("log")
-
-    if set_x_axis_size != None:
-        ax.set_xlim(set_x_axis_size)
-
-    ax.set(ylabel='Models/Methods', xlabel=ylabel)
-    ax = sns.despine(left=True, bottom=True)
-
-    plt.show()
-
-    #plt.savefig(store_folder + 'violinplot_fco' + info + description + '.png')
-
-
-def ecg_view(ecg, ecg_blw, ecg_dl, ecg_f, signal_name=None, beat_no=None):
-
+    # 노이즈 인덱스에 해당하는 노이즈 조합 정보 가져오기
+    noise_description = NOISE_COMBINATIONS.get(noise_index, "Unknown Noise Combination")
     fig, ax = plt.subplots(figsize=(16, 9))
-    plt.plot(ecg_blw, 'k', label='ECG + BLW')
-    plt.plot(ecg, 'g', label='ECG orig')
-    plt.plot(ecg_dl, 'b', label='ECG DL Filtered')
-    plt.plot(ecg_f, 'r', label='ECG IIR Filtered')
+    
+    # 신호 플롯
+    plt.plot(ecg_blw, 'k--', label=f'{noise_description}', alpha=0.7)
+    plt.plot(ecg, 'g-', label='ECG Original', lw=2)
+    plt.plot(ecg_dl, 'b-.', label='ECG DL Filtered', lw=2)
+    plt.plot(ecg_f, 'r-', label='ECG IIR Filtered', lw=1.5)
+    
     plt.grid(True)
-
-    plt.ylabel('au')
-    plt.xlabel('samples')
-
-    leg = ax.legend()
-
-    if signal_name != None and beat_no != None:
-        plt.title('Signal ' + str(signal_name) + 'beat ' + str(beat_no))
-    else:
-        plt.title('ECG signal for comparison')
-
-    plt.show()
-
-
-def ecg_view_diff(ecg, ecg_blw, ecg_dl, ecg_f, signal_name=None, beat_no=None):
-
-    fig, ax = plt.subplots(figsize=(16, 9))
-    plt.plot(ecg, 'g', label='ECG orig')
-    plt.plot(ecg_dl, 'b', label='ECG DL Filtered')
-    plt.plot(ecg_f, 'r', label='ECG IIR Filtered')
-    plt.plot(ecg - ecg_dl, color='#0099ff', lw=3, label='Difference ECG - DL Filter')
-    plt.plot(ecg - ecg_f, color='#cb828d', lw=3, label='Difference ECG - IIR Filter')
-    plt.grid(True)
-
     plt.ylabel('Amplitude (au)')
-    plt.xlabel('samples')
-
+    plt.xlabel('Samples')
+    
+    # 범례 추가
     leg = ax.legend()
 
-    if signal_name != None and beat_no != None:
-        plt.title('Signal ' + str(signal_name) + 'beat ' + str(beat_no))
+    # 신호 및 비트 번호에 대한 제목 설정 (노이즈 인덱스 포함)
+    if signal_name is not None and beat_no is not None:
+        plt.title(f'Signal {signal_name}, Beat {beat_no}, Noise: {noise_description}')
     else:
-        plt.title('ECG signal for comparison')
+        plt.title(f'ECG Signal Comparison with Noise: {noise_description}')
 
-    plt.show()
+    # 이미지 파일 저장
+    filename = f"ECG_Comparison_Beat_{beat_no}_Noise_{noise_index}.png"
+    filepath = os.path.join(save_dir, filename)
+    plt.savefig(filepath)
+    plt.close(fig)  # 창을 닫아 메모리 해제
+    
+    print(f"Saved: {filepath}")
 
+def ecg_view_3d(ecg, ecg_blw, ecg_dl, ecg_f, noise_index=None, signal_name=None, beat_no=None, save_dir='view'):
+    """
+    ECG 신호와 필터링된 신호들을 3D로 시각화하고, 노이즈 조합 정보를 제목에 표시하며 이미지를 저장합니다.
+    
+    Parameters:
+    ecg: 원본 ECG 신호
+    ecg_blw: 노이즈가 포함된 ECG 신호 (Baseline Wander 포함)
+    ecg_dl: DL로 필터링된 ECG 신호
+    ecg_f: IIR 필터로 필터링된 ECG 신호
+    noise_index: 노이즈 인덱스 (Optional)
+    signal_name: 시각화할 신호의 이름 (Optional)
+    beat_no: 시각화할 비트 번호 (Optional)
+    save_dir: 시각화한 이미지를 저장할 디렉토리 (Optional)
+    """
+    ensure_directory(save_dir)  # 디렉토리 생성
+
+    fig = plt.figure(figsize=(16, 9))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # 시간 축을 x로 하고 각 신호를 y, z 축으로 배치
+    t = np.arange(len(ecg))
+
+    # z 축을 크게 구분하여 신호들을 배치 (zdir='y'에 따라 구분)
+    ax.plot(t, ecg_blw, zs=3, zdir='y', label='Noisy ECG Signal', color='k', linestyle='--', lw=2, alpha=0.8)
+    ax.plot(t, ecg, zs=2, zdir='y', label='Clean ECG Signal', color='g', lw=2, alpha=0.8)
+    ax.plot(t, ecg_dl, zs=1, zdir='y', label='ECG DL Filtered', color='b', lw=2, alpha=0.8)
+    ax.plot(t, ecg_f, zs=0, zdir='y', label='ECG IIR Filtered', color='r', lw=2, alpha=0.8)
+
+    # 3D 축 레이블 설정
+    ax.set_xlabel('Samples', fontsize=14, labelpad=15)
+    ax.set_ylabel('Signal Type', fontsize=14, labelpad=15)
+    ax.set_zlabel('Amplitude', fontsize=14, labelpad=15)
+
+    # 노이즈 인덱스에 해당하는 노이즈 조합 정보 가져오기
+    noise_description = NOISE_COMBINATIONS.get(noise_index, "Unknown Noise Combination")
+    
+    # 신호 및 비트 번호에 대한 제목 설정 (노이즈 인덱스 포함)
+    if signal_name is not None and beat_no is not None:
+        plt.title(f'Signal {signal_name}, Beat {beat_no}, Noise: {noise_description}', fontsize=16, pad=20)
+    else:
+        plt.title(f'ECG Signal Comparison with Noise: {noise_description}', fontsize=16, pad=20)
+
+    # 그리드 추가 및 투명도 조절
+    ax.grid(True, linestyle='--', linewidth=0.5, alpha=0.7)
+
+    # 범례 표시
+    ax.legend(fontsize=12)
+    
+    # 시각적으로 더 부드럽게 보이도록 틱 설정
+    ax.tick_params(axis='both', which='major', labelsize=12, pad=10)
+
+    # 이미지 파일 저장
+    filename = f"ECG_3D_Comparison_Beat_{beat_no}_Noise_{noise_index}.png"
+    filepath = os.path.join(save_dir, filename)
+    plt.savefig(filepath)
+    plt.close(fig)  # 창을 닫아 메모리 해제
+    
+    print(f"Saved: {filepath}")
 
 def generate_table(metrics, metric_values, Exp_names):
     # Print tabular results in the console, in a pretty way

@@ -19,8 +19,8 @@ if __name__ == "__main__":
     #                   'Vanilla L',
     #                   'Vanilla NL',
     #                   'Multibranch LANL',
-    #                   'Multibranch LANLD','Transformer_DAE']
-    dl_experiments = ['Transformer_COMBDAE']
+    #                   'Multibranch LANLD', ]
+    dl_experiments = ['Transformer_DAE', 'Transformer_COMBDAE']
 
     train_time_list = []
     test_time_list = []
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     current_date = datetime.now().strftime('%m%d')
     
     for experiment in range(len(dl_experiments)):
-        if dl_experiments[experiment] in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS']:
+        if dl_experiments[experiment] in ['Transformer_COMBDAE','Transformer_COMBDAE_with_band_encoding','Transformer_COMBDAE_FreTS']:
             Dataset, valid_train_indices, valid_test_indices, noise_indices_train, noise_indices_test = Data_Preparation_with_Fourier(samples=512, channel_ratio=0.5, fs=360)
             X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y = Dataset
             start_train = datetime.now()

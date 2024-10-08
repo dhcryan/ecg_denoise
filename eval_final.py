@@ -23,7 +23,7 @@ if __name__ == "__main__":
                         'Vanilla L',
                         'Vanilla NL',
                         'Multibranch LANL',
-                        'Multibranch LANLD','Transformer_DAE','Transformer_COMBDAE']
+                        'Multibranch LANLD','Transformer_DAE','Transformer_COMBDAE','Transformer_COMBDAE_with_band_encoding']
 
     # def SSD(y, y_pred):
     #     return np.sum(np.square(y - y_pred), axis=1)  # axis 1 is the signal dimension
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         test_Multibranch_LANLD = pickle.load(input)
     # Load Results Transformer_DAE
 
-    with open('1006/test_results_' + dl_experiments[6] + '.pkl', 'rb') as input:
+    with open('1008/test_results_' + dl_experiments[6] + '.pkl', 'rb') as input:
         test_Transformer_DAE = pickle.load(input)
 
     # # Load Results Transformer_FDAE
@@ -84,11 +84,11 @@ if __name__ == "__main__":
     #     test_Transformer_FDAE = pickle.load(input)
         # Transformer_COMBDAE_with_CrossDomainAttention
     # Load Results Transformer_FDAE
-    with open('1006/test_results_' + dl_experiments[7] + '.pkl', 'rb') as input:
+    with open('1008/test_results_' + dl_experiments[7] + '.pkl', 'rb') as input:
         test_Transformer_COMBDAE = pickle.load(input)
             
-    # with open('1004/test_results_' + dl_experiments[8] + '.pkl', 'rb') as input:
-    #     test_Transformer_COMBDAE_FreTS = pickle.load(input)   
+    with open('1007/test_results_' + dl_experiments[8] + '.pkl', 'rb') as input:
+        test_Transformer_COMBDAE_with_band_encoding = pickle.load(input)   
         
         
     # Load Result FIR Filter
@@ -203,17 +203,17 @@ if __name__ == "__main__":
     COS_SIM_values_DL_exp_6 = COS_SIM(y_test, y_pred)
 
 
-    # # Transformer_FDAE
+    # Transformer_FDAE
 
-    # [X_test, y_test, y_pred] = test_Transformer_COMBDAE_FreTS
+    [X_test, y_test, y_pred] = test_Transformer_COMBDAE_with_band_encoding
 
-    # SSD_values_DL_exp_7 = SSD(y_test, y_pred)
+    SSD_values_DL_exp_7 = SSD(y_test, y_pred)
 
-    # MAD_values_DL_exp_7 = MAD(y_test, y_pred)
+    MAD_values_DL_exp_7 = MAD(y_test, y_pred)
 
-    # PRD_values_DL_exp_7 = PRD(y_test, y_pred)
+    PRD_values_DL_exp_7 = PRD(y_test, y_pred)
 
-    # COS_SIM_values_DL_exp_7 = COS_SIM(y_test, y_pred)
+    COS_SIM_values_DL_exp_7 = COS_SIM(y_test, y_pred)
 
     # Digital Filtering
 
@@ -250,7 +250,8 @@ if __name__ == "__main__":
                 SSD_values_DL_exp_3,
                 SSD_values_DL_exp_4,
                 SSD_values_DL_exp_5,
-                SSD_values_DL_exp_6]
+                SSD_values_DL_exp_6,
+                SSD_values_DL_exp_7]
 
     MAD_all = [MAD_values_FIR,
             MAD_values_IIR,
@@ -261,7 +262,8 @@ if __name__ == "__main__":
             MAD_values_DL_exp_3,
             MAD_values_DL_exp_4,
             MAD_values_DL_exp_5,
-            MAD_values_DL_exp_6
+            MAD_values_DL_exp_6,
+            MAD_values_DL_exp_7
             ]
 
     PRD_all = [PRD_values_FIR,
@@ -273,7 +275,8 @@ if __name__ == "__main__":
             PRD_values_DL_exp_3,
             PRD_values_DL_exp_4,
             PRD_values_DL_exp_5,
-            PRD_values_DL_exp_6
+            PRD_values_DL_exp_6,
+            PRD_values_DL_exp_7
             ]
 
     CORR_all = [COS_SIM_values_FIR,
@@ -285,7 +288,8 @@ if __name__ == "__main__":
                 COS_SIM_values_DL_exp_3,
                 COS_SIM_values_DL_exp_4,
                 COS_SIM_values_DL_exp_5,
-                COS_SIM_values_DL_exp_6
+                COS_SIM_values_DL_exp_6,
+                COS_SIM_values_DL_exp_7
                 ]
 
     Exp_names = ['FIR Filter', 'IIR Filter'] + dl_experiments

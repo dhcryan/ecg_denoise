@@ -39,6 +39,11 @@ python main.py
 This python script will train all the models, execute the experiments calculate the metrics and plot the result table 
 and some figures.
 
+~~~
+python eval_final.py >> result.txt
+~~~
+
+
 If you have a Nvidia CUDA capable device for GPU acceleration this code will automatically use it (faster). Otherwise the 
 training will be done in CPU (slower).   
 

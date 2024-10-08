@@ -44,7 +44,7 @@ def Data_Preparation(samples,channel_ratio):
     qtdb_keys = list(qtdb.keys())
 
     print(f"[INFO] Processing QTDatabase, {len(qtdb_keys)} signals to process.")
-
+# b_np.shape는 (512,)로, 패딩을 포함한 전체 샘플 크기가 512임을 알 수 있습니다.
     for signal_name in qtdb_keys:
         for b_idx, b in enumerate(qtdb[signal_name]):
             b_np = np.zeros(samples)
@@ -72,9 +72,11 @@ def Data_Preparation(samples,channel_ratio):
     #####################################
     print(f"[INFO] Adding noise to train and test sets")
     # Random scaling factor for train and test
+    # size=len(beats_train): beats_train의 길이만큼 난수를 생성합니다. 즉, beats_train에 있는 심박 데이터의 개수와 동일한 수의 난수를 생성합니다.
     rnd_train = np.random.randint(low=20, high=200, size=len(beats_train)) / 100
     noise_index = 0
     # Adding noise to train
+    # https://chatgpt.com/g/g-cKXjWStaE-python/c/66e1471b-57b4-8006-b921-233e7803fcab
     for beat_idx, beat in enumerate(beats_train):
         if np.random.rand() < channel_ratio:
             noise_combination_idx = np.random.randint(1, 8)  # 8 types of noise combinations

@@ -966,15 +966,15 @@ def Transformer_COMBDAE_FreTS(signal_size=512, head_size=64, num_heads=8, ff_dim
     # print(f'time_input: {time_input.shape}')
     # time_input: (None, 512, 1)
     # FreTS MLP_temporal 적용 (주파수 도메인에서 학습)
-    time_input = MLPTemporalFretsLayer(fft_length=1, embed_size=128)(time_input)
-    print(f'time_input after MLPTEMP: {time_input.shape}')
+    time_output = MLPTemporalFretsLayer(fft_length=1, embed_size=128)(time_input)
+    print(f'time_input after MLPTEMP: {time_output.shape}')
     # # Custom Keras Layer for MLP_temporal_frets
     # time_input = MLPTemporalFretsLayer(r, i, rb, ib, 1, 128)(time_input)
     # Time-domain 처리
-    x0 = Conv1D(filters=16, kernel_size=13, activation='linear', strides=2, padding='same')(time_input)
+    x0 = Conv1D(filters=16, kernel_size=13, activation='linear', strides=2, padding='same')(time_output)
     x0 = AddGatedNoise()(x0)
     x0 = Activation('sigmoid')(x0)
-    x0_ = Conv1D(filters=16, kernel_size=13, activation=None, strides=2, padding='same')(time_input)
+    x0_ = Conv1D(filters=16, kernel_size=13, activation=None, strides=2, padding='same')(time_output)
     xmul0 = Multiply()([x0, x0_])
     xmul0 = BatchNormalization()(xmul0)
 

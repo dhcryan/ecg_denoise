@@ -23,7 +23,7 @@ if __name__ == "__main__":
                         'Vanilla L',
                         'Vanilla NL',
                         'Multibranch LANL',
-                        'Multibranch LANLD','Transformer_DAE','Transformer_COMBDAE','Transformer_COMBDAE_with_band_encoding']
+                        'Multibranch LANLD','Transformer_DAE','Transformer_COMBDAE','Transformer_COMBDAE_FreTS']
 
     # def SSD(y, y_pred):
     #     return np.sum(np.square(y - y_pred), axis=1)  # axis 1 is the signal dimension
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         test_Multibranch_LANLD = pickle.load(input)
     # Load Results Transformer_DAE
 
-    with open('1008/test_results_' + dl_experiments[6] + '.pkl', 'rb') as input:
+    with open('1007/test_results_' + dl_experiments[6] + '.pkl', 'rb') as input:
         test_Transformer_DAE = pickle.load(input)
 
     # # Load Results Transformer_FDAE
@@ -84,11 +84,11 @@ if __name__ == "__main__":
     #     test_Transformer_FDAE = pickle.load(input)
         # Transformer_COMBDAE_with_CrossDomainAttention
     # Load Results Transformer_FDAE
-    with open('1008/test_results_' + dl_experiments[7] + '.pkl', 'rb') as input:
+    with open('1007/test_results_' + dl_experiments[7] + '.pkl', 'rb') as input:
         test_Transformer_COMBDAE = pickle.load(input)
             
-    with open('1007/test_results_' + dl_experiments[8] + '.pkl', 'rb') as input:
-        test_Transformer_COMBDAE_with_band_encoding = pickle.load(input)   
+    with open('1009/test_results_' + dl_experiments[8] + '.pkl', 'rb') as input:
+        test_Transformer_COMBDAE_FreTS = pickle.load(input)   
         
         
     # Load Result FIR Filter
@@ -205,7 +205,7 @@ if __name__ == "__main__":
 
     # Transformer_FDAE
 
-    [X_test, y_test, y_pred] = test_Transformer_COMBDAE_with_band_encoding
+    [X_test, y_test, y_pred] = test_Transformer_COMBDAE_FreTS
 
     SSD_values_DL_exp_7 = SSD(y_test, y_pred)
 

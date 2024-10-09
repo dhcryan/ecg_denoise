@@ -3,6 +3,7 @@ from keras import backend as K
 from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping, TensorBoard
 from keras import losses
 from sklearn.model_selection import train_test_split
+import tensorflow_probability as tfp
 import tensorflow as tf 
 from datetime import datetime
 from deepFilter.dl_models import *
@@ -28,11 +29,12 @@ def sad_loss(y_true, y_pred):
 def mad_loss(y_true, y_pred):
     return K.max(K.square(y_pred - y_true), axis=-2)
 
+
 def train_dl(Dataset, experiment):
 
     print('Deep Learning pipeline: Training the model for exp ' + str(experiment))
     
-    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_with_band_encoding','Transformer_COMBDAE_FreTS']:
+    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS']:
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
 
         # F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
@@ -86,10 +88,6 @@ def train_dl(Dataset, experiment):
         model = Transformer_COMBDAE()
         model_label = 'Transformer_COMBDAE'
 
-    if experiment == 'Transformer_COMBDAE_with_band_encoding':
-        model = Transformer_COMBDAE_with_band_encoding()
-        model_label = 'Transformer_COMBDAE_with_band_encoding'
-                
     if experiment == 'Transformer_COMBDAE_FreTS':
         model = Transformer_COMBDAE_FreTS()
         model_label = 'Transformer_COMBDAE_FreTS'
@@ -121,7 +119,7 @@ def train_dl(Dataset, experiment):
 
     else:
         criterion = combined_ssd_mad_loss
-
+        # criterion = combined_huber_freq_loss
 
     model.compile(loss=criterion,
                   optimizer=tf.keras.optimizers.Adam(lr=lr),
@@ -166,7 +164,7 @@ def train_dl(Dataset, experiment):
     early_stop = EarlyStopping(monitor="val_loss",  # "val_loss"
                                min_delta=0.01,
                                mode='min',  # on acc has to go max
-                               patience=10,
+                               patience=20,
                                verbose=1)
     
     tb_log_dir = './runs_' + current_date +'/' + model_label
@@ -184,7 +182,7 @@ def train_dl(Dataset, experiment):
 
     # GPU
     # if experiment == 'Transformer_COMBDAE_FreTS':
-    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_with_band_encoding','Transformer_COMBDAE_FreTS']:
+    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS']:
         model.fit(x=[X_train, F_train_x], y=y_train,
                 validation_data=([X_val, F_val_x], y_val),
                 batch_size=batch_size,
@@ -212,7 +210,7 @@ def test_dl(Dataset, experiment):
 
     print('Deep Learning pipeline: Testing the model')
 
-    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_with_band_encoding','Transformer_COMBDAE_FreTS']:
+    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS']:
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
 
         # F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
@@ -267,10 +265,6 @@ def test_dl(Dataset, experiment):
     if experiment == 'Transformer_COMBDAE':
         model = Transformer_COMBDAE()
         model_label = 'Transformer_COMBDAE'
-
-    if experiment == 'Transformer_COMBDAE_with_band_encoding':
-        model = Transformer_COMBDAE_with_band_encoding()
-        model_label = 'Transformer_COMBDAE_with_band_encoding'
                 
     if experiment == 'Transformer_COMBDAE_FreTS':
         model = Transformer_COMBDAE_FreTS()
@@ -288,6 +282,7 @@ def test_dl(Dataset, experiment):
 
     else:
         criterion = combined_ssd_mad_loss
+        # criterion = combined_huber_freq_loss
 
     model.compile(loss=criterion,
                   optimizer=tf.keras.optimizers.Adam(lr=0.01),
@@ -302,7 +297,7 @@ def test_dl(Dataset, experiment):
     # load weights
     model.load_weights(model_filepath)
     
-    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_with_band_encoding','Transformer_COMBDAE_FreTS']:
+    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS']:
         # Test score
         y_pred = model.predict([X_test, F_test_x], batch_size=batch_size, verbose=1)
 

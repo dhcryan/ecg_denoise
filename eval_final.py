@@ -87,7 +87,7 @@ if __name__ == "__main__":
     with open('1007/test_results_' + dl_experiments[7] + '.pkl', 'rb') as input:
         test_Transformer_COMBDAE = pickle.load(input)
             
-    with open('1009/test_results_' + dl_experiments[8] + '.pkl', 'rb') as input:
+    with open('1010/test_results_' + dl_experiments[8] + '.pkl', 'rb') as input:
         test_Transformer_COMBDAE_FreTS = pickle.load(input)   
         
         

@@ -882,38 +882,117 @@ def Transformer_COMBDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,
     model = Model(inputs=[time_input, freq_input], outputs=predictions)
     return model
 
+# import tensorflow as tf
+# from tensorflow.keras import layers, Model, Input
+
+# class MLPTemporalFretsLayer(layers.Layer):
+#     def __init__(self, fft_length, embed_size, **kwargs):
+#         super(MLPTemporalFretsLayer, self).__init__(**kwargs)
+#         self.fft_length = fft_length  # IFFT를 위한 길이
+#         self.embed_size = embed_size  # 임베딩 크기
+
+#     def build(self, input_shape):
+#         # Keras의 add_weight 메서드를 사용하여 학습 가능한 변수로 등록
+#         self.r = self.add_weight(
+#             shape=(self.embed_size, self.embed_size),
+#             initializer=tf.keras.initializers.RandomNormal(),
+#             trainable=True,
+#             name="r_weight"
+#         )
+#         self.i = self.add_weight(
+#             shape=(self.embed_size, self.embed_size),
+#             initializer=tf.keras.initializers.RandomNormal(),
+#             trainable=True,
+#             name="i_weight"
+#         )
+#         self.rb = self.add_weight(
+#             shape=(self.embed_size,),
+#             initializer=tf.keras.initializers.RandomNormal(),
+#             trainable=True,
+#             name="rb_bias"
+#         )
+#         self.ib = self.add_weight(
+#             shape=(self.embed_size,),
+#             initializer=tf.keras.initializers.RandomNormal(),
+#             trainable=True,
+#             name="ib_bias"
+#         )
+#         super(MLPTemporalFretsLayer, self).build(input_shape)
+
+#     def call(self, inputs):
+#         # 입력 텐서 차원: (batch_size, 512, 1)
+#         # FFT 적용 (주파수 도메인으로 변환)
+#         x = tf.signal.rfft(inputs)  # (batch_size, 512, 1)
+#         x_real = tf.math.real(x)
+#         x_imag = tf.math.imag(x)
+        
+#         # FreMLP_temporal 적용
+#         x = self.FreMLP_temporal(x_real, x_imag, self.r, self.i, self.rb, self.ib, self.embed_size)
+#         # print(f'x after FreMLP_temporal: {x.shape}')
+#         # x after FreMLP_temporal: (None, 512, 128)
+#         # IFFT로 시간 도메인으로 복원
+#         x = tf.signal.irfft(x, fft_length=[self.fft_length])
+#         print(f'x after IFFT: {x.shape}')
+#         # 마지막 차원을 1로 확장해서 Conv1D 입력에 맞게 변환
+#         # x = tf.expand_dims(x, axis=-1)  # (batch_size, 512, 1)
+#         # print(f'x after expand_dims: {x.shape}')
+#         return x
+
+#     def FreMLP_temporal(self, x_real, x_imag, r, i, rb, ib, embed_size):
+#         # 시계열 길이 추출 (512)
+#         time_steps = tf.shape(x_real)[1]
+
+#         # 실수 및 허수 성분의 출력을 미리 초기화
+#         o1_real = tf.zeros([tf.shape(x_real)[0], time_steps // 2 + 1, embed_size], dtype=tf.float32)
+#         o1_imag = tf.zeros([tf.shape(x_imag)[0], time_steps // 2 + 1, embed_size], dtype=tf.float32)
+
+#         # 실수 및 허수 성분에 대한 가중치 연산
+#         o1_real = tf.nn.relu(
+#             tf.einsum('bij,dd->bid', x_real, r) - 
+#             tf.einsum('bij,dd->bid', x_imag, i) + rb
+#         )
+
+#         o1_imag = tf.nn.relu(
+#             tf.einsum('bij,dd->bid', x_imag, r) + 
+#             tf.einsum('bij,dd->bid', x_real, i) + ib
+#         )
+
+#         # 실수 및 허수 성분을 결합하여 복소수 표현으로 반환
+#         y = tf.complex(o1_real, o1_imag)
+#         return y
 import tensorflow as tf
-from tensorflow.keras import layers, Model, Input
+from tensorflow.keras import layers
 
 class MLPTemporalFretsLayer(layers.Layer):
-    def __init__(self, fft_length, embed_size, **kwargs):
+    def __init__(self, fft_length, embed_size, scale=0.02, **kwargs):
         super(MLPTemporalFretsLayer, self).__init__(**kwargs)
         self.fft_length = fft_length  # IFFT를 위한 길이
         self.embed_size = embed_size  # 임베딩 크기
+        self.scale = scale  # 가중치 초기화 스케일
 
     def build(self, input_shape):
         # Keras의 add_weight 메서드를 사용하여 학습 가능한 변수로 등록
         self.r = self.add_weight(
             shape=(self.embed_size, self.embed_size),
-            initializer=tf.keras.initializers.RandomNormal(),
+            initializer=tf.keras.initializers.RandomNormal(mean=0., stddev=self.scale),
             trainable=True,
             name="r_weight"
         )
         self.i = self.add_weight(
             shape=(self.embed_size, self.embed_size),
-            initializer=tf.keras.initializers.RandomNormal(),
+            initializer=tf.keras.initializers.RandomNormal(mean=0., stddev=self.scale),
             trainable=True,
             name="i_weight"
         )
         self.rb = self.add_weight(
             shape=(self.embed_size,),
-            initializer=tf.keras.initializers.RandomNormal(),
+            initializer=tf.keras.initializers.RandomNormal(mean=0., stddev=self.scale),
             trainable=True,
             name="rb_bias"
         )
         self.ib = self.add_weight(
             shape=(self.embed_size,),
-            initializer=tf.keras.initializers.RandomNormal(),
+            initializer=tf.keras.initializers.RandomNormal(mean=0., stddev=self.scale),
             trainable=True,
             name="ib_bias"
         )
@@ -928,34 +1007,32 @@ class MLPTemporalFretsLayer(layers.Layer):
         
         # FreMLP_temporal 적용
         x = self.FreMLP_temporal(x_real, x_imag, self.r, self.i, self.rb, self.ib, self.embed_size)
-        # print(f'x after FreMLP_temporal: {x.shape}')
-        # x after FreMLP_temporal: (None, 512, 128)
+        
         # IFFT로 시간 도메인으로 복원
         x = tf.signal.irfft(x, fft_length=[self.fft_length])
-        print(f'x after IFFT: {x.shape}')
-        # 마지막 차원을 1로 확장해서 Conv1D 입력에 맞게 변환
-        # x = tf.expand_dims(x, axis=-1)  # (batch_size, 512, 1)
-        # print(f'x after expand_dims: {x.shape}')
         return x
 
     def FreMLP_temporal(self, x_real, x_imag, r, i, rb, ib, embed_size):
-        # x_real: (batch_size, 512, 1)
+        # 시계열 길이 추출 (512)
+        time_steps = tf.shape(x_real)[1]
 
-        # x_real과 x_imag의 마지막 차원을 embed_size로 확장
-        x_real = tf.tile(x_real, [1, 1, embed_size])
-        x_imag = tf.tile(x_imag, [1, 1, embed_size])
-        # x_real과 x_imag의 크기는 이제 (batch_size, 512, 128)
+        # 실수 및 허수 성분의 출력을 미리 초기화
+        o1_real = tf.zeros([tf.shape(x_real)[0], time_steps // 2 + 1, embed_size], dtype=tf.float32)
+        o1_imag = tf.zeros([tf.shape(x_imag)[0], time_steps // 2 + 1, embed_size], dtype=tf.float32)
 
-        # FreMLP 계산: 실수 및 허수 성분 가중치와의 연산
-        o_real = tf.nn.relu(
-            tf.einsum('...ij,jk->...ik', x_real, r) - tf.einsum('...ij,jk->...ik', x_imag, i) + rb
-        )
-        o_imag = tf.nn.relu(
-            tf.einsum('...ij,jk->...ik', x_imag, r) + tf.einsum('...ij,jk->...ik', x_real, i) + ib
+        # 실수 및 허수 성분에 대한 가중치 연산
+        o1_real = tf.nn.relu(
+            tf.einsum('bij,dd->bid', x_real, r) - 
+            tf.einsum('bij,dd->bid', x_imag, i) + rb
         )
 
-        # 실수 및 허수 성분을 복합 표현으로 합침
-        y = tf.complex(o_real, o_imag)  # (batch_size, 512, 128)
+        o1_imag = tf.nn.relu(
+            tf.einsum('bij,dd->bid', x_imag, r) + 
+            tf.einsum('bij,dd->bid', x_real, i) + ib
+        )
+
+        # 실수 및 허수 성분을 결합하여 복소수 표현으로 반환
+        y = tf.complex(o1_real, o1_imag)
         return y
 
 # Transformer_COMBDAE 모델에 MLP_temporal 적용
@@ -966,7 +1043,7 @@ def Transformer_COMBDAE_FreTS(signal_size=512, head_size=64, num_heads=8, ff_dim
     # print(f'time_input: {time_input.shape}')
     # time_input: (None, 512, 1)
     # FreTS MLP_temporal 적용 (주파수 도메인에서 학습)
-    time_output = MLPTemporalFretsLayer(fft_length=1, embed_size=128)(time_input)
+    time_output = MLPTemporalFretsLayer(fft_length=1, embed_size=128, scale=0.02)(time_input)
     print(f'time_input after MLPTEMP: {time_output.shape}')
     # # Custom Keras Layer for MLP_temporal_frets
     # time_input = MLPTemporalFretsLayer(r, i, rb, ib, 1, 128)(time_input)

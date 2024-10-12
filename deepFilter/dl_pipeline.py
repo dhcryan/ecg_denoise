@@ -164,7 +164,7 @@ def train_dl(Dataset, experiment):
     early_stop = EarlyStopping(monitor="val_loss",  # "val_loss"
                                min_delta=0.01,
                                mode='min',  # on acc has to go max
-                               patience=20,
+                               patience=30,
                                verbose=1)
     
     tb_log_dir = './runs_' + current_date +'/' + model_label

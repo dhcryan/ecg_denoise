@@ -76,7 +76,7 @@ if __name__ == "__main__":
         test_Multibranch_LANLD = pickle.load(input)
     # Load Results Transformer_DAE
 
-    with open('1007/test_results_' + dl_experiments[6] + '.pkl', 'rb') as input:
+    with open('1010/test_results_' + dl_experiments[6] + '.pkl', 'rb') as input:
         test_Transformer_DAE = pickle.load(input)
 
     # # Load Results Transformer_FDAE
@@ -84,10 +84,10 @@ if __name__ == "__main__":
     #     test_Transformer_FDAE = pickle.load(input)
         # Transformer_COMBDAE_with_CrossDomainAttention
     # Load Results Transformer_FDAE
-    with open('1007/test_results_' + dl_experiments[7] + '.pkl', 'rb') as input:
+    with open('1010/test_results_' + dl_experiments[7] + '.pkl', 'rb') as input:
         test_Transformer_COMBDAE = pickle.load(input)
             
-    with open('1010/test_results_' + dl_experiments[8] + '.pkl', 'rb') as input:
+    with open('1012/test_results_' + dl_experiments[8] + '.pkl', 'rb') as input:
         test_Transformer_COMBDAE_FreTS = pickle.load(input)   
         
         

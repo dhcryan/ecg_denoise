@@ -882,94 +882,17 @@ def Transformer_COMBDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,
     model = Model(inputs=[time_input, freq_input], outputs=predictions)
     return model
 
-# import tensorflow as tf
-# from tensorflow.keras import layers, Model, Input
-
-# class MLPTemporalFretsLayer(layers.Layer):
-#     def __init__(self, fft_length, embed_size, **kwargs):
-#         super(MLPTemporalFretsLayer, self).__init__(**kwargs)
-#         self.fft_length = fft_length  # IFFT를 위한 길이
-#         self.embed_size = embed_size  # 임베딩 크기
-
-#     def build(self, input_shape):
-#         # Keras의 add_weight 메서드를 사용하여 학습 가능한 변수로 등록
-#         self.r = self.add_weight(
-#             shape=(self.embed_size, self.embed_size),
-#             initializer=tf.keras.initializers.RandomNormal(),
-#             trainable=True,
-#             name="r_weight"
-#         )
-#         self.i = self.add_weight(
-#             shape=(self.embed_size, self.embed_size),
-#             initializer=tf.keras.initializers.RandomNormal(),
-#             trainable=True,
-#             name="i_weight"
-#         )
-#         self.rb = self.add_weight(
-#             shape=(self.embed_size,),
-#             initializer=tf.keras.initializers.RandomNormal(),
-#             trainable=True,
-#             name="rb_bias"
-#         )
-#         self.ib = self.add_weight(
-#             shape=(self.embed_size,),
-#             initializer=tf.keras.initializers.RandomNormal(),
-#             trainable=True,
-#             name="ib_bias"
-#         )
-#         super(MLPTemporalFretsLayer, self).build(input_shape)
-
-#     def call(self, inputs):
-#         # 입력 텐서 차원: (batch_size, 512, 1)
-#         # FFT 적용 (주파수 도메인으로 변환)
-#         x = tf.signal.rfft(inputs)  # (batch_size, 512, 1)
-#         x_real = tf.math.real(x)
-#         x_imag = tf.math.imag(x)
-        
-#         # FreMLP_temporal 적용
-#         x = self.FreMLP_temporal(x_real, x_imag, self.r, self.i, self.rb, self.ib, self.embed_size)
-#         # print(f'x after FreMLP_temporal: {x.shape}')
-#         # x after FreMLP_temporal: (None, 512, 128)
-#         # IFFT로 시간 도메인으로 복원
-#         x = tf.signal.irfft(x, fft_length=[self.fft_length])
-#         print(f'x after IFFT: {x.shape}')
-#         # 마지막 차원을 1로 확장해서 Conv1D 입력에 맞게 변환
-#         # x = tf.expand_dims(x, axis=-1)  # (batch_size, 512, 1)
-#         # print(f'x after expand_dims: {x.shape}')
-#         return x
-
-#     def FreMLP_temporal(self, x_real, x_imag, r, i, rb, ib, embed_size):
-#         # 시계열 길이 추출 (512)
-#         time_steps = tf.shape(x_real)[1]
-
-#         # 실수 및 허수 성분의 출력을 미리 초기화
-#         o1_real = tf.zeros([tf.shape(x_real)[0], time_steps // 2 + 1, embed_size], dtype=tf.float32)
-#         o1_imag = tf.zeros([tf.shape(x_imag)[0], time_steps // 2 + 1, embed_size], dtype=tf.float32)
-
-#         # 실수 및 허수 성분에 대한 가중치 연산
-#         o1_real = tf.nn.relu(
-#             tf.einsum('bij,dd->bid', x_real, r) - 
-#             tf.einsum('bij,dd->bid', x_imag, i) + rb
-#         )
-
-#         o1_imag = tf.nn.relu(
-#             tf.einsum('bij,dd->bid', x_imag, r) + 
-#             tf.einsum('bij,dd->bid', x_real, i) + ib
-#         )
-
-#         # 실수 및 허수 성분을 결합하여 복소수 표현으로 반환
-#         y = tf.complex(o1_real, o1_imag)
-#         return y
 import tensorflow as tf
 from tensorflow.keras import layers
 
+
 class MLPTemporalFretsLayer(layers.Layer):
-    def __init__(self, fft_length, embed_size, scale=0.02, **kwargs):
+    def __init__(self, fft_length, embed_size, sparsity_threshold, scale=0.02, **kwargs):
         super(MLPTemporalFretsLayer, self).__init__(**kwargs)
         self.fft_length = fft_length  # IFFT를 위한 길이
         self.embed_size = embed_size  # 임베딩 크기
         self.scale = scale  # 가중치 초기화 스케일
-
+        self.sparsity_threshold = sparsity_threshold
     def build(self, input_shape):
         # Keras의 add_weight 메서드를 사용하여 학습 가능한 변수로 등록
         self.r = self.add_weight(
@@ -1030,11 +953,36 @@ class MLPTemporalFretsLayer(layers.Layer):
             tf.einsum('bij,dd->bid', x_imag, r) + 
             tf.einsum('bij,dd->bid', x_real, i) + ib
         )
-
-        # 실수 및 허수 성분을 결합하여 복소수 표현으로 반환
-        y = tf.complex(o1_real, o1_imag)
+        y = tf.stack([o1_real, o1_imag], axis=-1)
+        # print(f'y: {y.shape}')
+        # y: (None, 512, 128, 2)
+        # print(f'y: {y}')
+        # softshrink 연산을 직접 구현하여 희소성 추가
+        y = self.softshrink(y, lambd=self.sparsity_threshold)
+        # print(f'y after softshrink: {y.shape}')
+        # print(f'y after softshrink: {y}')
+#         y: Tensor("model/mlp_temporal_frets_layer/stack:0", shape=(None, 512, 128, 2), dtype=float32)
+# y after softshrink: (None, 512, 128, 2)
+# y after softshrink: Tensor("model/mlp_temporal_frets_layer/SelectV2:0", shape=(None, 512, 128, 2), dtype=float32)
+#         print(f'y[..., 0]: {y[..., 0]}')
+#         print(f'y[..., 1]: {y[..., 1]}')
+#         y[..., 0]: Tensor("model/mlp_temporal_frets_layer/strided_slice_3:0", shape=(None, 512, 128), dtype=float32)
+# y[..., 1]: Tensor("model/mlp_temporal_frets_layer/strided_slice_4:0", shape=(None, 512, 128), dtype=float32)
+        # (batch_size, time_steps // 2 + 1, embed_size, 2)에서 복소수 표현으로 변환
+        y = tf.complex(y[..., 0], y[..., 1])
+#         print(f'y after complex: {y.shape}')
+#         print(f'y after complex: {y}')
+#         y after complex: (None, 512, 128)
+# y after complex: Tensor("model/mlp_temporal_frets_layer/Complex:0", shape=(None, 512, 128), dtype=complex64)
         return y
-
+    
+    def softshrink(self, inputs, lambd):
+        # Softshrink 연산을 직접 구현
+        return tf.where(
+            tf.abs(inputs) > lambd, 
+            inputs - tf.sign(inputs) * lambd, 
+            tf.zeros_like(inputs)
+        )
 # Transformer_COMBDAE 모델에 MLP_temporal 적용
 def Transformer_COMBDAE_FreTS(signal_size=512, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0):
     input_shape = (signal_size, 1)
@@ -1043,8 +991,9 @@ def Transformer_COMBDAE_FreTS(signal_size=512, head_size=64, num_heads=8, ff_dim
     # print(f'time_input: {time_input.shape}')
     # time_input: (None, 512, 1)
     # FreTS MLP_temporal 적용 (주파수 도메인에서 학습)
-    time_output = MLPTemporalFretsLayer(fft_length=1, embed_size=128, scale=0.02)(time_input)
-    print(f'time_input after MLPTEMP: {time_output.shape}')
+    time_output = MLPTemporalFretsLayer(fft_length=1, embed_size=32, sparsity_threshold=0.01, scale=0.02)(time_input)
+    # print(f'time_input after MLPTEMP: {time_output.shape}')
+    # time_input after MLPTEMP: (None, 512, 1)
     # # Custom Keras Layer for MLP_temporal_frets
     # time_input = MLPTemporalFretsLayer(r, i, rb, ib, 1, 128)(time_input)
     # Time-domain 처리

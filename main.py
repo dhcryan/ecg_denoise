@@ -20,7 +20,7 @@ if __name__ == "__main__":
     #                   'Vanilla NL',
     #                   'Multibranch LANL',
     #                   'Multibranch LANLD', 'Transformer_DAE', 'Transformer_COMBDAE']
-    dl_experiments = ['Transformer_DAE', 'Transformer_COMBDAE']
+    dl_experiments = ['Transformer_DAE']
 
     train_time_list = []
     test_time_list = []
@@ -62,7 +62,7 @@ if __name__ == "__main__":
         # 추가 시각화 (특정 실험에만 해당)
         if experiment in ['Transformer_COMBDAE', 'Transformer_COMBDAE_FreTS']:
             visualize_multiple_beats(X_train, y_train, noise_indices_train, num_samples=5)
-            visualize_signals(y_train, X_train, fs=360, num_samples=5, signal_length=512, save_dir='visualizations')
+            visualize_signals(y_train, X_train, fs=360, num_samples=5, signal_length=512, save_dir='visualizations/plot_signals')
             plot_ecg_comparison_separate(X_train, y_train, valid_train_indices, "Training Set", num_beats=5, save_dir='visualizations')
             plot_ecg_comparison_separate(X_test, y_test, valid_test_indices, "Testing Set", num_beats=5, save_dir='visualizations')
 

@@ -75,14 +75,14 @@ def ecg_view_noisy_comparison(ecg_clean, ecg_noisy, noise_index, signal_name=Non
     else:
         plt.title(f"ECG Signal Comparison with Noise Index: {noise_index} ({noise_description})")
 
-    # 추가 정보 표시 (진폭 범위와 평균값 비교)
-    textstr = f"Amplitude Range (Clean): {amplitude_range_clean:.2f}\n"\
-              f"Amplitude Range (Noisy): {amplitude_range_noisy:.2f}\n"\
-              f"Mean (Clean): {mean_clean:.2f}\n"\
-              f"Mean (Noisy): {mean_noisy:.2f}"
+    # # 추가 정보 표시 (진폭 범위와 평균값 비교)
+    # textstr = f"Amplitude Range (Clean): {amplitude_range_clean:.2f}\n"\
+    #           f"Amplitude Range (Noisy): {amplitude_range_noisy:.2f}\n"\
+    #           f"Mean (Clean): {mean_clean:.2f}\n"\
+    #           f"Mean (Noisy): {mean_noisy:.2f}"
     
-    # 그래프 안에 텍스트로 추가 정보 표시
-    plt.gcf().text(0.15, 0.85, textstr, fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
+    # # 그래프 안에 텍스트로 추가 정보 표시
+    # plt.gcf().text(0.15, 0.85, textstr, fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
 
     # plt.show()
     # 이미지 파일 저장
@@ -116,7 +116,7 @@ def visualize_multiple_beats(X_train, y_train, noise_indices_train, num_samples=
         noise_idx = noise_indices_train[idx]  # 해당 신호에 추가된 노이즈 인덱스
         
         # 시각화 함수 호출 (샘플 인덱스 추가)
-        ecg_view_noisy_comparison(ecg_clean, ecg_noisy, noise_index=noise_idx, signal_name="SampleECG", sample_index=idx, save_dir='visualizations')
+        ecg_view_noisy_comparison(ecg_clean, ecg_noisy, noise_index=noise_idx, signal_name="SampleECG", sample_index=idx, save_dir='visualizations/ecg_view_noisy_comparison')
 
 
 # 시간 도메인에서 신호 시각화
@@ -199,7 +199,7 @@ def plot_spectrogram(signal, fs, title='Spectrogram', save_dir='visualizations',
     plt.close()
     print(f"Saved: {filepath}")
 
-def visualize_signals(y_train, X_train, fs, num_samples=3, signal_length=512, save_dir='visualizations'):
+def visualize_signals(y_train, X_train, fs, num_samples=3, signal_length=512, save_dir='visualizations/plot_signals'):
     """
     여러 신호에 대해 다양한 도메인에서 시각화하고, 이미지를 파일로 저장합니다.
     

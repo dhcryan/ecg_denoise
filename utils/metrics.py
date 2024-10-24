@@ -41,4 +41,12 @@ def COS_SIM(y, y_pred):
     cos_sim = np.array(cos_sim)
     return cos_sim
 
-
+def SNR(y, y_pred):
+    signal_power = np.sum(np.square(y), axis=1)
+    noise_power = np.sum(np.square(y - y_pred), axis=1)
+    
+    # 분모가 0이 되는 것을 방지하기 위해 작은 값을 더해줌
+    noise_power = np.where(noise_power == 0, 1e-10, noise_power)
+    
+    snr_value = 10 * np.log10(signal_power / noise_power)
+    return snr_value

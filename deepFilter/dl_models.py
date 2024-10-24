@@ -538,7 +538,7 @@ def Conv1DTranspose(input_tensor, filters, kernel_size, strides=2, activation='r
 def transformer_encoder(inputs,head_size,num_heads,ff_dim,dropout=0):
     # Normalization and Attention
     x = layers.LayerNormalization(epsilon=1e-6)(inputs)
-    x= layers.MultiHeadAttention(
+    x = layers.MultiHeadAttention(
         key_dim=head_size, num_heads=num_heads, dropout=dropout)(x, x)
     x = layers.Dropout(dropout)(x)
     res = x + inputs
@@ -553,6 +553,28 @@ def transformer_encoder(inputs,head_size,num_heads,ff_dim,dropout=0):
 ks = 13   #orig 13
 ks1 = 7
 
+def frequency_encoder(inputs, ff_dim, kernel_size=3, dropout=0):
+    # Normalization
+    x = layers.LayerNormalization(epsilon=1e-6)(inputs)
+    
+    # Feed Forward Network (Conv1D)
+    # Conv1D로 주파수 대역의 국소적 정보를 추출
+    x = layers.Conv1D(filters=ff_dim, kernel_size=kernel_size, activation="relu", padding='same')(x)
+    x = layers.Dropout(dropout)(x)
+    
+    # Conv1D로 차원을 원래 입력 크기로 복원
+    x = layers.Conv1D(filters=inputs.shape[-1], kernel_size=kernel_size, padding='same')(x)
+    
+    # Residual connection
+    res = x + inputs
+
+    # Normalization과 Dropout 추가
+    res = layers.LayerNormalization(epsilon=1e-6)(res)
+    res = layers.Dropout(dropout)(res)
+    
+    return res
+
+
 # 학습 중 노이즈를 추가하여 강건성을 높이는 역할
 class AddGatedNoise(layers.Layer):
     def __init__(self, **kwargs):
@@ -561,7 +583,59 @@ class AddGatedNoise(layers.Layer):
     def call(self, x, training=None):
         noise = tf.random.uniform(shape=tf.shape(x), minval=-1, maxval=1)
         return tf.keras.backend.in_train_phase(x * (1 + noise), x, training=training)
-    
+def get_emb(sin_inp):
+    """
+    Gets a base embedding for one dimension with sin and cos intertwined
+    """
+    emb = tf.stack((tf.sin(sin_inp), tf.cos(sin_inp)), -1)
+    emb = tf.reshape(emb, (*emb.shape[:-2], -1))
+    return emb
+
+class TFPositionalEncoding1D(tf.keras.layers.Layer):
+    def __init__(self, channels: int, dtype=tf.float32):
+        """
+        Args:
+            channels int: The last dimension of the tensor you want to apply pos emb to.
+        Keyword Args:
+            dtype: output type of the encodings. Default is "tf.float32".
+        """
+        super(TFPositionalEncoding1D, self).__init__()
+
+        self.channels = int(np.ceil(channels / 2) * 2)
+        self.inv_freq = np.float32(
+            1
+            / np.power(
+                10000, np.arange(0, self.channels, 2) / np.float32(self.channels)
+            )
+        )
+        self.cached_penc = None
+
+    @tf.function
+    def call(self, inputs):
+        """
+        :param tensor: A 3d tensor of size (batch_size, x, ch)
+        :return: Positional Encoding Matrix of size (batch_size, x, ch)
+        """
+        if len(inputs.shape) != 3:
+            raise RuntimeError("The input tensor has to be 3d!")
+
+        if self.cached_penc is not None and self.cached_penc.shape == inputs.shape:
+            return self.cached_penc
+
+        self.cached_penc = None
+        _, x, org_channels = inputs.shape
+
+        dtype = self.inv_freq.dtype
+        pos_x = tf.range(x, dtype=dtype)
+        sin_inp_x = tf.einsum("i,j->ij", pos_x, self.inv_freq)
+        emb = tf.expand_dims(get_emb(sin_inp_x), 0)
+        emb = emb[0]  # A bit of a hack
+        self.cached_penc = tf.repeat(
+            emb[None, :, :org_channels], tf.shape(inputs)[0], axis=0
+        )
+
+        return self.cached_penc
+        
 def Transformer_DAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_transformer_blocks=6, dropout=0):   ###paper 1 model
 
     input_shape = (signal_size, 1)
@@ -595,9 +669,7 @@ def Transformer_DAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_
                 strides=2,
                 padding='same')(xmul0)
 
-
     x1 = AddGatedNoise()(x1)
-
 
     x1 = layers.Activation('sigmoid')(x1)
 
@@ -677,58 +749,7 @@ def Transformer_DAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_
     model = Model(inputs=[input], outputs=predictions)
     return model
 
-def get_emb(sin_inp):
-    """
-    Gets a base embedding for one dimension with sin and cos intertwined
-    """
-    emb = tf.stack((tf.sin(sin_inp), tf.cos(sin_inp)), -1)
-    emb = tf.reshape(emb, (*emb.shape[:-2], -1))
-    return emb
 
-class TFPositionalEncoding1D(tf.keras.layers.Layer):
-    def __init__(self, channels: int, dtype=tf.float32):
-        """
-        Args:
-            channels int: The last dimension of the tensor you want to apply pos emb to.
-        Keyword Args:
-            dtype: output type of the encodings. Default is "tf.float32".
-        """
-        super(TFPositionalEncoding1D, self).__init__()
-
-        self.channels = int(np.ceil(channels / 2) * 2)
-        self.inv_freq = np.float32(
-            1
-            / np.power(
-                10000, np.arange(0, self.channels, 2) / np.float32(self.channels)
-            )
-        )
-        self.cached_penc = None
-
-    @tf.function
-    def call(self, inputs):
-        """
-        :param tensor: A 3d tensor of size (batch_size, x, ch)
-        :return: Positional Encoding Matrix of size (batch_size, x, ch)
-        """
-        if len(inputs.shape) != 3:
-            raise RuntimeError("The input tensor has to be 3d!")
-
-        if self.cached_penc is not None and self.cached_penc.shape == inputs.shape:
-            return self.cached_penc
-
-        self.cached_penc = None
-        _, x, org_channels = inputs.shape
-
-        dtype = self.inv_freq.dtype
-        pos_x = tf.range(x, dtype=dtype)
-        sin_inp_x = tf.einsum("i,j->ij", pos_x, self.inv_freq)
-        emb = tf.expand_dims(get_emb(sin_inp_x), 0)
-        emb = emb[0]  # A bit of a hack
-        self.cached_penc = tf.repeat(
-            emb[None, :, :org_channels], tf.shape(inputs)[0], axis=0
-        )
-
-        return self.cached_penc
 
 ks = 13   #orig 13
 ks1 = 7
@@ -919,42 +940,76 @@ class MLPTemporalFretsLayer(layers.Layer):
             trainable=True,
             name="ib_bias"
         )
+        self.embeddings = tf.Variable(
+            initial_value=tf.random.normal([1, self.embed_size]),
+            trainable=True,
+            name="embeddings"
+        )
+        self.fc = tf.keras.Sequential([
+            layers.Dense(512 * 1, activation='relu'),  # 입력을 (512 * 1)로 변환
+            layers.Reshape((512, 1))  # 차원을 (512, 1)로 재구성
+        ])
         super(MLPTemporalFretsLayer, self).build(input_shape)
-
+        
+    def tokenEmb(self, inputs):
+        # 임베딩 확장: [Batch, Input length, Channel]
+        x = tf.transpose(inputs, perm=[0, 2, 1])
+        # 입력 텐서 차원: (batch_size, 1,512)
+        x = tf.expand_dims(x, axis=-1)  # 차원 확장
+        # x after expand_dims: (None, 1, 512, 1)
+        #print(f'x after expand_dims: {x.shape}')
+        y = self.embeddings
+        return x * y
+    
     def call(self, inputs):
         # 입력 텐서 차원: (batch_size, 512, 1)
         # FFT 적용 (주파수 도메인으로 변환)
-        x = tf.signal.rfft(inputs)  # (batch_size, 512, 1)
-        x_real = tf.math.real(x)
-        x_imag = tf.math.imag(x)
-        
+        # x = tf.signal.rfft(inputs)  # (batch_size, 512, 1)
+        x = inputs        
+        x = self.tokenEmb(x)
+        bias = x
+        # 입력 텐서 차원: (batch_size, 1,512, emd_size)
         # FreMLP_temporal 적용
-        x = self.FreMLP_temporal(x_real, x_imag, self.r, self.i, self.rb, self.ib, self.embed_size)
-        
+        x = self.FreMLP_temporal(x, self.r, self.i, self.rb, self.ib, self.embed_size)
+        print(f'x: {x.shape}')
+        # x: (None, 1, 512, 32)
+        #x = x + bias  # Bias 추가        
+        x = x + tf.cast(bias, dtype=tf.complex64)
         # IFFT로 시간 도메인으로 복원
-        x = tf.signal.irfft(x, fft_length=[self.fft_length])
+        # x = tf.signal.irfft(x, fft_length=[self.fft_length])
+        x = tf.squeeze(x, axis=1)
+        print(f'x after squeeze: {x.shape}')
+        x = tf.reshape(x, [tf.shape(x)[0], 512, 1])
+        print(f'x after reshape: {x.shape}')
+        x = self.fc(x)  # fc 레이어 적용하여 (512, 1)로 변환
+        print(f'x after fc: {x.shape}')
         return x
 
-    def FreMLP_temporal(self, x_real, x_imag, r, i, rb, ib, embed_size):
+    def FreMLP_temporal(self, x, r, i, rb, ib, embed_size):
         # 시계열 길이 추출 (512)
-        time_steps = tf.shape(x_real)[1]
-
+        # 입력 텐서 차원: (batch_size, 1,512, emd_size)
+        #print(f'x: {x.shape}')  
+        #v x: (None, 1, 512, 32)
+        time_steps = tf.shape(x)[2]
+        x_real = tf.math.real(x)
+        x_imag = tf.math.imag(x)
         # 실수 및 허수 성분의 출력을 미리 초기화
-        o1_real = tf.zeros([tf.shape(x_real)[0], time_steps // 2 + 1, embed_size], dtype=tf.float32)
-        o1_imag = tf.zeros([tf.shape(x_imag)[0], time_steps // 2 + 1, embed_size], dtype=tf.float32)
-
+        o1_real = tf.zeros([tf.shape(x)[0], 1, time_steps // 2 +1, embed_size], dtype=tf.float32)
+        o1_imag = tf.zeros([tf.shape(x)[0], 1, time_steps // 2 +1, embed_size], dtype=tf.float32)
+        # 입력 텐서 차원: (batch_size, 1, 257, emd_size)
         # 실수 및 허수 성분에 대한 가중치 연산
         o1_real = tf.nn.relu(
-            tf.einsum('bij,dd->bid', x_real, r) - 
-            tf.einsum('bij,dd->bid', x_imag, i) + rb
+            tf.einsum('bijd,dd->bijd', x_real, r) - 
+            tf.einsum('bijd,dd->bijd', x_imag, i) + rb
         )
-
+        # 입력 텐서 차원: (batch_size, 1, 257, emd_size)
         o1_imag = tf.nn.relu(
-            tf.einsum('bij,dd->bid', x_imag, r) + 
-            tf.einsum('bij,dd->bid', x_real, i) + ib
+            tf.einsum('bijd,dd->bijd', x_imag, r) + 
+            tf.einsum('bijd,dd->bijd', x_real, i) + ib
         )
         y = tf.stack([o1_real, o1_imag], axis=-1)
-        # print(f'y: {y.shape}')
+                # 입력 텐서 차원: (batch_size, 1, 257, emd_size,2)
+        print(f'y: {y.shape}')
         # y: (None, 512, 128, 2)
         # print(f'y: {y}')
         # softshrink 연산을 직접 구현하여 희소성 추가
@@ -970,7 +1025,8 @@ class MLPTemporalFretsLayer(layers.Layer):
 # y[..., 1]: Tensor("model/mlp_temporal_frets_layer/strided_slice_4:0", shape=(None, 512, 128), dtype=float32)
         # (batch_size, time_steps // 2 + 1, embed_size, 2)에서 복소수 표현으로 변환
         y = tf.complex(y[..., 0], y[..., 1])
-#         print(f'y after complex: {y.shape}')
+        #         y after complex: (None, 1, 512, embed)
+        print(f'y after complex: {y.shape}')
 #         print(f'y after complex: {y}')
 #         y after complex: (None, 512, 128)
 # y after complex: Tensor("model/mlp_temporal_frets_layer/Complex:0", shape=(None, 512, 128), dtype=complex64)
@@ -991,16 +1047,16 @@ def Transformer_COMBDAE_FreTS(signal_size=512, head_size=64, num_heads=8, ff_dim
     # print(f'time_input: {time_input.shape}')
     # time_input: (None, 512, 1)
     # FreTS MLP_temporal 적용 (주파수 도메인에서 학습)
-    time_output = MLPTemporalFretsLayer(fft_length=1, embed_size=32, sparsity_threshold=0.01, scale=0.02)(time_input)
+    freq_output = MLPTemporalFretsLayer(fft_length=1, embed_size=32, sparsity_threshold=0.01, scale=0.02)(freq_input)
     # print(f'time_input after MLPTEMP: {time_output.shape}')
     # time_input after MLPTEMP: (None, 512, 1)
     # # Custom Keras Layer for MLP_temporal_frets
     # time_input = MLPTemporalFretsLayer(r, i, rb, ib, 1, 128)(time_input)
     # Time-domain 처리
-    x0 = Conv1D(filters=16, kernel_size=13, activation='linear', strides=2, padding='same')(time_output)
+    x0 = Conv1D(filters=16, kernel_size=13, activation='linear', strides=2, padding='same')(time_input)
     x0 = AddGatedNoise()(x0)
     x0 = Activation('sigmoid')(x0)
-    x0_ = Conv1D(filters=16, kernel_size=13, activation=None, strides=2, padding='same')(time_output)
+    x0_ = Conv1D(filters=16, kernel_size=13, activation=None, strides=2, padding='same')(time_input)
     xmul0 = Multiply()([x0, x0_])
     xmul0 = BatchNormalization()(xmul0)
 
@@ -1019,7 +1075,7 @@ def Transformer_COMBDAE_FreTS(signal_size=512, head_size=64, num_heads=8, ff_dim
     xmul2 = BatchNormalization()(xmul2)
     # print(f'f2 after MLPTEMP: {f2.shape}')
     # f2 after MLPTEMP: (None, 512, 16)
-    f2 = frequency_branch(freq_input, 16, 13)
+    f2 = frequency_branch(freq_output , 16, 13)
     # print(f'f2 after branch: {f2.shape}')
     # f2 after branch: (None, 64, 64)
     # 시간 및 주파수 도메인 결합
@@ -1046,4 +1102,66 @@ def Transformer_COMBDAE_FreTS(signal_size=512, head_size=64, num_heads=8, ff_dim
     predictions = Conv1DTranspose(input_tensor=x8, filters=1, kernel_size=13, activation='linear', strides=2, padding='same')
 
     model = Model(inputs=[time_input, freq_input], outputs=predictions)
+    return model
+
+import tensorflow as tf
+from tensorflow.keras.layers import Input, Conv1D, Multiply, BatchNormalization, Activation, Dense, Concatenate, Add
+from tensorflow.keras.models import Model
+
+def Transformer_Gated_CombDAE_freqencoder(signal_size=sigLen, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0):
+    input_shape = (signal_size, 1)
+    time_input = Input(shape=input_shape)
+    freq_input = Input(shape=input_shape)
+
+    # 시간 도메인 처리
+    x0 = Conv1D(filters=16, kernel_size=13, activation='linear', strides=2, padding='same')(time_input)
+    x0 = AddGatedNoise()(x0)
+    x0 = Activation('sigmoid')(x0)
+    x0_ = Conv1D(filters=16, kernel_size=13, activation=None, strides=2, padding='same')(time_input)
+    xmul0 = Multiply()([x0, x0_])
+    xmul0 = BatchNormalization()(xmul0)
+
+    x1 = Conv1D(filters=32, kernel_size=13, activation='linear', strides=2, padding='same')(xmul0)
+    x1 = AddGatedNoise()(x1)
+    x1 = Activation('sigmoid')(x1)
+    x1_ = Conv1D(filters=32, kernel_size=13, activation=None, strides=2, padding='same')(xmul0)
+    xmul1 = Multiply()([x1, x1_])
+    xmul1 = BatchNormalization()(xmul1)
+
+    x2 = Conv1D(filters=64, kernel_size=13, activation='linear', strides=2, padding='same')(xmul1)
+    x2 = AddGatedNoise()(x2)
+    x2 = Activation('sigmoid')(x2)
+    x2_ = Conv1D(filters=64, kernel_size=13, activation='elu', strides=2, padding='same')(xmul1)
+    xmul2 = Multiply()([x2, x2_])
+    xmul2 = BatchNormalization()(xmul2)
+
+    # Transformer encoder를 시간 도메인에만 적용
+    position_embed = TFPositionalEncoding1D(signal_size)
+    x2_pos = position_embed(xmul2)  # Positional encoding 추가
+    for _ in range(num_transformer_blocks):
+        x2_pos = transformer_encoder(x2_pos, head_size, num_heads, ff_dim, dropout)
+
+    # 주파수 도메인 처리 (Conv1D만 적용, attention 없음)
+    f2 = frequency_branch(freq_input, 16, 13)
+    
+    for _ in range(num_transformer_blocks):
+        f2 = frequency_encoder(f2, ff_dim, kernel_size=3, dropout=0.1)
+    
+    gated_output = layers.Concatenate()([x2_pos, f2])
+    # Deconvolution 과정
+    x4 = Conv1DTranspose(input_tensor=gated_output, filters=64, kernel_size=13, activation='elu', strides=1, padding='same')
+    x4 = Add()([x4, xmul2])
+    x4 = BatchNormalization()(x4)
+
+    x5 = Conv1DTranspose(input_tensor=x4, filters=32, kernel_size=13, activation='elu', strides=2, padding='same')
+    x5 = Add()([x5, xmul1])
+    x5 = BatchNormalization()(x5)
+
+    x6 = Conv1DTranspose(input_tensor=x5, filters=16, kernel_size=13, activation='elu', strides=2, padding='same')
+    x6 = Add()([x6, xmul0])
+    x6 = BatchNormalization()(x6)
+
+    x7 = Conv1DTranspose(input_tensor=x6, filters=1, kernel_size=13, activation='linear', strides=2, padding='same')
+
+    model = Model(inputs=[time_input, freq_input], outputs=x7)
     return model

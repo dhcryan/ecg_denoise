@@ -5,7 +5,7 @@ from datetime import datetime
 import time
 import numpy as np
 import os
-from utils.metrics import MAD, SSD, PRD, COS_SIM
+from utils.metrics import MAD, SSD, PRD, COS_SIM, SNR
 from utils.visualization import generate_hboxplot, generate_violinplots, generate_barplot, generate_boxplot
 from utils.visualization import generate_table, generate_table_time, ecg_view_3d, ecg_view
 # from utils import visualization as vs
@@ -23,31 +23,7 @@ if __name__ == "__main__":
                         'Vanilla L',
                         'Vanilla NL',
                         'Multibranch LANL',
-                        'Multibranch LANLD','Transformer_DAE','Transformer_COMBDAE','Transformer_COMBDAE_FreTS']
-
-    # def SSD(y, y_pred):
-    #     return np.sum(np.square(y - y_pred), axis=1)  # axis 1 is the signal dimension
-
-
-    # def MAD(y, y_pred):
-    #     return np.max(np.abs(y - y_pred), axis=1) # axis 1 is the signal dimension
-
-
-    # def PRD(y, y_pred):
-    #     N = np.sum(np.square(y_pred - y), axis=1)
-    #     D = np.sum(np.square(y_pred - np.mean(y)), axis=1)
-    #     PRD = np.sqrt(N/D) * 100
-    #     return PRD
-
-    # def COS_SIM(y, y_pred):
-    #     cos_sim = []
-    #     y = np.squeeze(y, axis=-1)
-    #     y_pred = np.squeeze(y_pred, axis=-1)
-    #     for idx in range(len(y)):
-    #         kl_temp = cosine_similarity(y[idx].reshape(1, -1), y_pred[idx].reshape(1, -1))
-    #         cos_sim.append(kl_temp)
-    #     cos_sim = np.array(cos_sim)
-    #     return cos_sim
+                        'Multibranch LANLD','Transformer_DAE','Transformer_COMBDAE','Transformer_Gated_CombDAE']
 
     ####### LOAD EXPERIMENTS #######
 
@@ -76,19 +52,15 @@ if __name__ == "__main__":
         test_Multibranch_LANLD = pickle.load(input)
     # Load Results Transformer_DAE
 
-    with open('1014/test_results_' + dl_experiments[6] + '.pkl', 'rb') as input:
+    with open('1024/test_results_' + dl_experiments[6] + '.pkl', 'rb') as input:
         test_Transformer_DAE = pickle.load(input)
 
-    # # Load Results Transformer_FDAE
-    # with open('0920/test_results_' + dl_experiments[7] + '.pkl', 'rb') as input:
-    #     test_Transformer_FDAE = pickle.load(input)
-        # Transformer_COMBDAE_with_CrossDomainAttention
     # Load Results Transformer_FDAE
-    with open('1013/test_results_' + dl_experiments[7] + '.pkl', 'rb') as input:
+    with open('1024/test_results_' + dl_experiments[7] + '.pkl', 'rb') as input:
         test_Transformer_COMBDAE = pickle.load(input)
             
-    with open('1012/test_results_' + dl_experiments[8] + '.pkl', 'rb') as input:
-        test_Transformer_COMBDAE_FreTS = pickle.load(input)   
+    with open('1023/test_results_' + dl_experiments[8] + '.pkl', 'rb') as input:
+        test_Transformer_Gated_CombDAE_freqencoder = pickle.load(input)   
         
         
     # Load Result FIR Filter
@@ -117,6 +89,8 @@ if __name__ == "__main__":
 
     COS_SIM_values_DL_DRNN = COS_SIM(y_test, y_pred)
 
+    SNR_values_DL_DRNN = SNR(y_test, y_pred)
+    
     # Exp FCN-DAE
 
     [X_test, y_test, y_pred] = test_FCN_DAE
@@ -128,6 +102,8 @@ if __name__ == "__main__":
     PRD_values_DL_FCN_DAE = PRD(y_test, y_pred)
 
     COS_SIM_values_DL_FCN_DAE = COS_SIM(y_test, y_pred)
+    
+    SNR_values_DL_FCN_DAE = SNR(y_test, y_pred)
 
     # Vanilla L
 
@@ -140,6 +116,8 @@ if __name__ == "__main__":
     PRD_values_DL_exp_1 = PRD(y_test, y_pred)
 
     COS_SIM_values_DL_exp_1 = COS_SIM(y_test, y_pred)
+    
+    SNR_values_DL_exp_1 = SNR(y_test, y_pred)
 
     # Vanilla_NL
 
@@ -152,6 +130,8 @@ if __name__ == "__main__":
     PRD_values_DL_exp_2 = PRD(y_test, y_pred)
 
     COS_SIM_values_DL_exp_2 = COS_SIM(y_test, y_pred)
+    
+    SNR_values_DL_exp_2 = SNR(y_test, y_pred)
 
     # Multibranch_LANL
 
@@ -164,6 +144,8 @@ if __name__ == "__main__":
     PRD_values_DL_exp_3 = PRD(y_test, y_pred)
 
     COS_SIM_values_DL_exp_3 = COS_SIM(y_test, y_pred)
+    
+    SNR_values_DL_exp_3 = SNR(y_test, y_pred)
 
     # Multibranch_LANLD
 
@@ -176,6 +158,8 @@ if __name__ == "__main__":
     PRD_values_DL_exp_4 = PRD(y_test, y_pred)
 
     COS_SIM_values_DL_exp_4 = COS_SIM(y_test, y_pred)
+    
+    SNR_values_DL_exp_4 = SNR(y_test, y_pred)
 
 
     # Transformer_DAE
@@ -189,6 +173,8 @@ if __name__ == "__main__":
     PRD_values_DL_exp_5 = PRD(y_test, y_pred)
 
     COS_SIM_values_DL_exp_5 = COS_SIM(y_test, y_pred)
+    
+    SNR_values_DL_exp_5 = SNR(y_test, y_pred)
 
     # Transformer_FDAE
 
@@ -201,11 +187,13 @@ if __name__ == "__main__":
     PRD_values_DL_exp_6 = PRD(y_test, y_pred)
 
     COS_SIM_values_DL_exp_6 = COS_SIM(y_test, y_pred)
+    
+    SNR_values_DL_exp_6 = SNR(y_test, y_pred)
 
 
     # Transformer_FDAE
 
-    [X_test, y_test, y_pred] = test_Transformer_COMBDAE_FreTS
+    [X_test, y_test, y_pred] = test_Transformer_Gated_CombDAE_freqencoder
 
     SSD_values_DL_exp_7 = SSD(y_test, y_pred)
 
@@ -214,6 +202,8 @@ if __name__ == "__main__":
     PRD_values_DL_exp_7 = PRD(y_test, y_pred)
 
     COS_SIM_values_DL_exp_7 = COS_SIM(y_test, y_pred)
+    
+    SNR_values_DL_exp_7 = SNR(y_test, y_pred)
 
     # Digital Filtering
 
@@ -227,6 +217,8 @@ if __name__ == "__main__":
     PRD_values_FIR = PRD(y_test, y_filter)
 
     COS_SIM_values_FIR = COS_SIM(y_test, y_filter)
+    
+    SNR_values_FIR = SNR(y_test, y_filter)
 
     # IIR Filtering Metrics (Best)
     [X_test, y_test, y_filter] = test_IIR
@@ -238,6 +230,8 @@ if __name__ == "__main__":
     PRD_values_IIR = PRD(y_test, y_filter)
 
     COS_SIM_values_IIR = COS_SIM(y_test, y_filter)
+    
+    SNR_values_IIR = SNR(y_test, y_filter)
 
     ####### Results Visualization #######
 
@@ -292,10 +286,22 @@ if __name__ == "__main__":
                 COS_SIM_values_DL_exp_7
                 ]
 
+    SNR_all = [SNR_values_FIR,
+            SNR_values_IIR,
+            SNR_values_DL_FCN_DAE,
+            SNR_values_DL_DRNN,
+            SNR_values_DL_exp_1,
+            SNR_values_DL_exp_2,
+            SNR_values_DL_exp_3,
+            SNR_values_DL_exp_4,
+            SNR_values_DL_exp_5,
+            SNR_values_DL_exp_6,
+            SNR_values_DL_exp_7]
+
     Exp_names = ['FIR Filter', 'IIR Filter'] + dl_experiments
 
-    metrics = ['SSD', 'MAD', 'PRD', 'COS_SIM']
-    metric_values = [SSD_all, MAD_all, PRD_all, CORR_all]
+    metrics = ['SSD', 'MAD', 'PRD', 'COS_SIM', 'SNR']
+    metric_values = [SSD_all, MAD_all, PRD_all, CORR_all, SNR_all]
 
     # Metrics table
     generate_table(metrics, metric_values, Exp_names)
@@ -306,7 +312,8 @@ if __name__ == "__main__":
     
     
     rnd_test = np.load('rnd_test.npy')
-
+    # print(rnd_test.shape)
+    # 13316,
     # rnd_test = np.concatenate([rnd_test, rnd_test])
 
     segm = [0.2, 0.6, 1.0, 1.5, 2.0]  # real number of segmentations is len(segmentations) - 1
@@ -314,80 +321,64 @@ if __name__ == "__main__":
     MAD_seg_all = []
     PRD_seg_all = []
     COS_SIM_seg_all = []
-
+    SNR_seg_all = []
+    
     for idx_exp in range(len(Exp_names)):
-        SSD_seg = [None] * (len(segm) - 1)
-        MAD_seg = [None] * (len(segm) - 1)
-        PRD_seg = [None] * (len(segm) - 1)
-        COS_SIM_seg = [None] * (len(segm) - 1)
+        SSD_seg = [[] for _ in range(len(segm) - 1)]
+        MAD_seg = [[] for _ in range(len(segm) - 1)]
+        PRD_seg = [[] for _ in range(len(segm) - 1)]
+        COS_SIM_seg = [[] for _ in range(len(segm) - 1)]
+        SNR_seg = [[] for _ in range(len(segm) - 1)]
+
         for idx_seg in range(len(segm) - 1):
-            SSD_seg[idx_seg] = []
-            MAD_seg[idx_seg] = []
-            PRD_seg[idx_seg] = []
-            COS_SIM_seg[idx_seg] = []
             for idx in range(len(rnd_test)):
-                # Object under analysis (oua)
-                # SSD
-                oua = SSD_all[idx_exp][idx]
-                if rnd_test[idx] > segm[idx_seg] and rnd_test[idx] < segm[idx_seg + 1]:
-                    SSD_seg[idx_seg].append(oua)
+                if segm[idx_seg] < rnd_test[idx] < segm[idx_seg + 1]:
+                    # SSD
+                    SSD_seg[idx_seg].append(SSD_all[idx_exp][idx])
+                    # MAD
+                    MAD_seg[idx_seg].append(MAD_all[idx_exp][idx])
+                    # PRD
+                    PRD_seg[idx_seg].append(PRD_all[idx_exp][idx])
+                    # COS_SIM
+                    COS_SIM_seg[idx_seg].append(CORR_all[idx_exp][idx])
+                    # SNR
+                    SNR_seg[idx_seg].append(SNR_all[idx_exp][idx])
 
-                # MAD
-                oua = MAD_all[idx_exp][idx]
-                if rnd_test[idx] > segm[idx_seg] and rnd_test[idx] < segm[idx_seg + 1]:
-                    MAD_seg[idx_seg].append(oua)
-
-                # PRD
-                oua = PRD_all[idx_exp][idx]
-                if rnd_test[idx] > segm[idx_seg] and rnd_test[idx] < segm[idx_seg + 1]:
-                    PRD_seg[idx_seg].append(oua)
-
-                # COS SIM
-                oua = CORR_all[idx_exp][idx]
-                if rnd_test[idx] > segm[idx_seg] and rnd_test[idx] < segm[idx_seg + 1]:
-                    COS_SIM_seg[idx_seg].append(oua)
-
-        # Processing the last index
-        # SSD
+        # 마지막 구간 처리
         SSD_seg[-1] = []
         for idx in range(len(rnd_test)):
-            # Object under analysis
-            oua = SSD_all[idx_exp][idx]
             if rnd_test[idx] > segm[-2]:
-                SSD_seg[-1].append(oua)
-
-        SSD_seg_all.append(SSD_seg)  # [exp][seg][item]
+                SSD_seg[-1].append(SSD_all[idx_exp][idx])
+        SSD_seg_all.append(SSD_seg)
 
         # MAD
         MAD_seg[-1] = []
         for idx in range(len(rnd_test)):
-            # Object under analysis
-            oua = MAD_all[idx_exp][idx]
             if rnd_test[idx] > segm[-2]:
-                MAD_seg[-1].append(oua)
-
-        MAD_seg_all.append(MAD_seg)  # [exp][seg][item]
+                MAD_seg[-1].append(MAD_all[idx_exp][idx])
+        MAD_seg_all.append(MAD_seg)
 
         # PRD
         PRD_seg[-1] = []
         for idx in range(len(rnd_test)):
-            # Object under analysis
-            oua = PRD_all[idx_exp][idx]
             if rnd_test[idx] > segm[-2]:
-                PRD_seg[-1].append(oua)
-
-        PRD_seg_all.append(PRD_seg)  # [exp][seg][item]
+                PRD_seg[-1].append(PRD_all[idx_exp][idx])
+        PRD_seg_all.append(PRD_seg)
 
         # COS SIM
         COS_SIM_seg[-1] = []
         for idx in range(len(rnd_test)):
-            # Object under analysis
-            oua = CORR_all[idx_exp][idx]
             if rnd_test[idx] > segm[-2]:
-                COS_SIM_seg[-1].append(oua)
+                COS_SIM_seg[-1].append(CORR_all[idx_exp][idx])
+        COS_SIM_seg_all.append(COS_SIM_seg)
 
-        COS_SIM_seg_all.append(COS_SIM_seg)  # [exp][seg][item]
-
+        # SNR
+        SNR_seg[-1] = []
+        for idx in range(len(rnd_test)):
+            if rnd_test[idx] > segm[-2]:
+                SNR_seg[-1].append(SNR_all[idx_exp][idx])
+        SNR_seg_all.append(SNR_seg)
+        
     # Printing Tables
     seg_table_column_name = []
     for idx_seg in range(len(segm) - 1):
@@ -426,6 +417,14 @@ if __name__ == "__main__":
     print('Printing Table for different noise values on the COS SIM metric')
     generate_table(seg_table_column_name, COS_SIM_seg_all, Exp_names)
 
+    # SNR Table
+    SNR_seg_all = np.array(SNR_seg_all)
+    SNR_seg_all = np.swapaxes(SNR_seg_all, 0, 1)
+    
+    print('\n')
+    print('Printing Table for different noise values on the SNR metric')
+    generate_table(seg_table_column_name, SNR_seg_all, Exp_names)
+    # print(SNR_seg_all)
     # 저장 경로 설정
     save_directory = 'plots'
 
@@ -448,8 +447,13 @@ if __name__ == "__main__":
     filename_cos_hbox = 'cos_hboxplot.png'
     filename_cos_violin = 'cos_violinplot.png'
     filename_cos_bar = 'cos_barplot.png'
-    filename_cos_box = 'cos_boxplot.png'
+    filename_cos_box = 'cos_boxplot.png' 
 
+    filename_snr_hbox = 'snr_hboxplot.png'
+    filename_snr_violin = 'snr_violinplot.png'
+    filename_snr_bar = 'snr_barplot.png'
+    filename_snr_box = 'snr_boxplot.png'
+    
     # SSD 그래프들 생성
     print("Generating SSD plots...")
     generate_hboxplot(SSD_all, Exp_names, 'SSD (au)', log=False, save_dir=save_directory, filename=filename_ssd_hbox, set_x_axis_size=(0, 100.1))
@@ -477,6 +481,12 @@ if __name__ == "__main__":
     generate_violinplots(CORR_all, Exp_names, 'Cosine Similarity (0-1)', log=False, save_dir=save_directory, filename=filename_cos_violin, set_x_axis_size=(0, 1))
     generate_barplot(CORR_all, Exp_names, 'Cosine Similarity (0-1)', log=False, save_dir=save_directory, filename=filename_cos_bar, set_x_axis_size=(0, 1))
     generate_boxplot(CORR_all, Exp_names, 'Cosine Similarity (0-1)', log=False, save_dir=save_directory, filename=filename_cos_box, set_x_axis_size=(0, 1))
+    
+    print("Generating SNR plots...")
+    generate_hboxplot(SNR_all, Exp_names, 'SNR (dB)', log=False, save_dir=save_directory, filename=filename_snr_hbox, set_x_axis_size=(-30, 30))
+    generate_violinplots(SNR_all, Exp_names, 'SNR (dB)', log=False, save_dir=save_directory, filename=filename_snr_violin, set_x_axis_size=(-30, 30))
+    generate_barplot(SNR_all, Exp_names, 'SNR (dB)', log=False, save_dir=save_directory, filename=filename_snr_bar, set_x_axis_size=(-30, 30))
+    generate_boxplot(SNR_all, Exp_names, 'SNR (dB)', log=False, save_dir=save_directory, filename=filename_snr_box, set_x_axis_size=(-30, 30))
     
     # Test signal plotting
     signals_index = np.array([110, 210, 410, 810, 1610, 3210, 6410, 12810]) + 10

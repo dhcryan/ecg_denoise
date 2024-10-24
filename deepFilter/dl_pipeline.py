@@ -34,7 +34,7 @@ def train_dl(Dataset, experiment):
 
     print('Deep Learning pipeline: Training the model for exp ' + str(experiment))
     
-    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS']:
+    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_Gated_CombDAE_freqencoder']:
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
 
         # F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
@@ -87,10 +87,14 @@ def train_dl(Dataset, experiment):
     if experiment == 'Transformer_COMBDAE':
         model = Transformer_COMBDAE()
         model_label = 'Transformer_COMBDAE'
-
+        
     if experiment == 'Transformer_COMBDAE_FreTS':
         model = Transformer_COMBDAE_FreTS()
         model_label = 'Transformer_COMBDAE_FreTS'
+
+    if experiment == 'Transformer_Gated_CombDAE_freqencoder':
+        model = Transformer_Gated_CombDAE_freqencoder()
+        model_label = 'Transformer_Gated_CombDAE_freqencoder'
     
     print('\n ' + model_label + '\n ')
 
@@ -182,7 +186,7 @@ def train_dl(Dataset, experiment):
 
     # GPU
     # if experiment == 'Transformer_COMBDAE_FreTS':
-    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS']:
+    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_Gated_CombDAE_freqencoder']:
         model.fit(x=[X_train, F_train_x], y=y_train,
                 validation_data=([X_val, F_val_x], y_val),
                 batch_size=batch_size,
@@ -210,7 +214,7 @@ def test_dl(Dataset, experiment):
 
     print('Deep Learning pipeline: Testing the model')
 
-    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS']:
+    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_Gated_CombDAE_freqencoder']:
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
 
         # F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
@@ -258,7 +262,6 @@ def test_dl(Dataset, experiment):
         model_label = 'Multibranch_LANLD'
         
     if experiment == 'Transformer_DAE':
-        # Transformer_FDAE
         model = Transformer_DAE()
         model_label = 'Transformer_DAE'
         
@@ -269,6 +272,10 @@ def test_dl(Dataset, experiment):
     if experiment == 'Transformer_COMBDAE_FreTS':
         model = Transformer_COMBDAE_FreTS()
         model_label = 'Transformer_COMBDAE_FreTS'
+                
+    if experiment == 'Transformer_Gated_CombDAE_freqencoder':
+        model = Transformer_Gated_CombDAE_freqencoder()
+        model_label = 'Transformer_Gated_CombDAE_freqencoder'
     print('\n ' + model_label + '\n ')
 
     model.summary()
@@ -297,7 +304,7 @@ def test_dl(Dataset, experiment):
     # load weights
     model.load_weights(model_filepath)
     
-    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS']:
+    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_Gated_CombDAE_freqencoder']:
         # Test score
         y_pred = model.predict([X_test, F_test_x], batch_size=batch_size, verbose=1)
 

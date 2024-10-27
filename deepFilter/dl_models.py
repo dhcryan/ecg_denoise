@@ -553,28 +553,6 @@ def transformer_encoder(inputs,head_size,num_heads,ff_dim,dropout=0):
 ks = 13   #orig 13
 ks1 = 7
 
-def frequency_encoder(inputs, ff_dim, kernel_size=3, dropout=0):
-    # Normalization
-    x = layers.LayerNormalization(epsilon=1e-6)(inputs)
-    
-    # Feed Forward Network (Conv1D)
-    # Conv1D로 주파수 대역의 국소적 정보를 추출
-    x = layers.Conv1D(filters=ff_dim, kernel_size=kernel_size, activation="relu", padding='same')(x)
-    x = layers.Dropout(dropout)(x)
-    
-    # Conv1D로 차원을 원래 입력 크기로 복원
-    x = layers.Conv1D(filters=inputs.shape[-1], kernel_size=kernel_size, padding='same')(x)
-    
-    # Residual connection
-    res = x + inputs
-
-    # Normalization과 Dropout 추가
-    res = layers.LayerNormalization(epsilon=1e-6)(res)
-    res = layers.Dropout(dropout)(res)
-    
-    return res
-
-
 # 학습 중 노이즈를 추가하여 강건성을 높이는 역할
 class AddGatedNoise(layers.Layer):
     def __init__(self, **kwargs):
@@ -863,6 +841,7 @@ def Transformer_COMBDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,
         x3 = transformer_encoder(x3,head_size,num_heads,ff_dim, dropout)
     # x = layers.GlobalAvgPool1D(data_format='channels_first')(x)
     # x4 = x4+xmul2
+    
     x4 = x3
     x5 = Conv1DTranspose(input_tensor=x4,
                         filters=64,
@@ -902,6 +881,116 @@ def Transformer_COMBDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,
 
     model = Model(inputs=[time_input, freq_input], outputs=predictions)
     return model
+
+import tensorflow as tf
+from tensorflow.keras.layers import Conv1D, BatchNormalization, Activation, Multiply, Input, Concatenate
+from tensorflow.keras.models import Model
+from tensorflow.keras import layers
+
+# Sub-Pixel Convolution layer for upsampling
+class SubPixelConv1D(tf.keras.layers.Layer):
+    def __init__(self, scale):
+        super(SubPixelConv1D, self).__init__()
+        self.scale = scale
+
+    def call(self, inputs):
+        batch_size, length, channels = tf.shape(inputs)[0], tf.shape(inputs)[1], tf.shape(inputs)[2]
+        reshaped = tf.reshape(inputs, (batch_size, length, channels // self.scale, self.scale))
+        return tf.reshape(tf.transpose(reshaped, perm=[0, 1, 3, 2]), (batch_size, length * self.scale, channels // self.scale))
+
+# Fusion Network for combining time and frequency domain features
+class FusionNetwork(tf.keras.layers.Layer):
+    def __init__(self, filters):
+        super(FusionNetwork, self).__init__()
+        self.conv1 = Conv1D(filters=filters, kernel_size=3, padding='same', activation='relu')
+        self.conv2 = Conv1D(filters=filters, kernel_size=3, padding='same', activation='relu')
+
+    def call(self, time_features, freq_features):
+        combined = Concatenate()([time_features, freq_features])
+        x = self.conv1(combined)
+        x = self.conv2(x)
+        return x
+
+def frequency_branch_updated(input_tensor, filters, kernel_size=13):
+    x0 = Conv1D(filters=filters, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(input_tensor)
+    x0 = Activation('sigmoid')(x0)
+
+    x0_ = Conv1D(filters=filters, kernel_size=kernel_size, activation=None, strides=2, padding='same')(input_tensor)
+    xmul0 = Multiply()([x0, x0_])
+    xmul0 = BatchNormalization()(xmul0)
+
+    x1 = Conv1D(filters=filters * 2, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(xmul0)
+    x1 = Activation('sigmoid')(x1)
+
+    x1_ = Conv1D(filters=filters * 2, kernel_size=kernel_size, activation=None, strides=2, padding='same')(xmul0)
+    xmul1 = Multiply()([x1, x1_])
+    xmul1 = BatchNormalization()(xmul1)
+
+    x2 = Conv1D(filters=filters * 4, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(xmul1)
+    x2 = Activation('sigmoid')(x2)
+
+    x2_ = Conv1D(filters=filters * 4, kernel_size=kernel_size, activation='elu', strides=2, padding='same')(xmul1)
+    xmul2 = Multiply()([x2, x2_])
+    xmul2 = BatchNormalization()(xmul2)
+
+    return xmul2
+
+def Transformer_COMBDAE_updated(signal_size=sigLen, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0.1):
+    input_shape = (signal_size, 1)
+    time_input = Input(shape=input_shape)
+    freq_input = Input(shape=input_shape)
+
+    # Conv1D layers for time domain
+    x0 = Conv1D(filters=16, kernel_size=ks, activation='linear', strides=2, padding='same')(time_input)
+    x0 = Activation('sigmoid')(x0)
+    x0_ = Conv1D(filters=16, kernel_size=ks, activation=None, strides=2, padding='same')(time_input)
+    xmul0 = Multiply()([x0, x0_])
+    xmul0 = BatchNormalization()(xmul0)
+
+    x1 = Conv1D(filters=32, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul0)
+    x1 = Activation('sigmoid')(x1)
+    x1_ = Conv1D(filters=32, kernel_size=ks, activation=None, strides=2, padding='same')(xmul0)
+    xmul1 = Multiply()([x1, x1_])
+    xmul1 = BatchNormalization()(xmul1)
+
+    x2 = Conv1D(filters=64, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul1)
+    x2 = Activation('sigmoid')(x2)
+    x2_ = Conv1D(filters=64, kernel_size=ks, activation='elu', strides=2, padding='same')(xmul1)
+    xmul2 = Multiply()([x2, x2_])
+    xmul2 = BatchNormalization()(xmul2)
+
+    # Frequency branch
+    f2 = frequency_branch_updated(freq_input, filters=16, kernel_size=ks)
+
+    # Fusion Network
+    fusion_output = FusionNetwork(128)(xmul2, f2)
+
+    # Transformer Encoder Blocks
+    # Assuming TFPositionalEncoding1D and transformer_encoder are properly defined elsewhere
+    position_embed = TFPositionalEncoding1D(signal_size)
+    x3 = fusion_output + position_embed(fusion_output)
+
+    for _ in range(num_transformer_blocks):
+        x3 = transformer_encoder(x3, head_size, num_heads, ff_dim, dropout)
+
+    # Upsampling with Sub-Pixel Convolution
+    x4 = SubPixelConv1D(scale=2)(x3)
+    x4 = Conv1D(filters=64, kernel_size=ks, activation='elu', padding='same')(x4)
+    x4 = BatchNormalization()(x4)
+
+    x5 = SubPixelConv1D(scale=2)(x4)
+    x5 = Conv1D(filters=32, kernel_size=ks, activation='elu', padding='same')(x5)
+    x5 = BatchNormalization()(x5)
+
+    x6 = SubPixelConv1D(scale=2)(x5)
+    x6 = Conv1D(filters=16, kernel_size=ks, activation='elu', padding='same')(x6)
+    x6 = BatchNormalization()(x6)
+
+    predictions = Conv1D(filters=1, kernel_size=ks, activation='linear', padding='same')(x6)
+
+    model = Model(inputs=[time_input, freq_input], outputs=predictions)
+    return model
+
 
 import tensorflow as tf
 from tensorflow.keras import layers
@@ -1108,60 +1197,208 @@ import tensorflow as tf
 from tensorflow.keras.layers import Input, Conv1D, Multiply, BatchNormalization, Activation, Dense, Concatenate, Add
 from tensorflow.keras.models import Model
 
-def Transformer_Gated_CombDAE_freqencoder(signal_size=sigLen, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0):
-    input_shape = (signal_size, 1)
-    time_input = Input(shape=input_shape)
-    freq_input = Input(shape=input_shape)
 
-    # 시간 도메인 처리
-    x0 = Conv1D(filters=16, kernel_size=13, activation='linear', strides=2, padding='same')(time_input)
-    x0 = AddGatedNoise()(x0)
-    x0 = Activation('sigmoid')(x0)
-    x0_ = Conv1D(filters=16, kernel_size=13, activation=None, strides=2, padding='same')(time_input)
-    xmul0 = Multiply()([x0, x0_])
-    xmul0 = BatchNormalization()(xmul0)
+# def Transformer_Gated_CombDAE_freqencoder(signal_size=sigLen, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0):
+#     input_shape = (signal_size, 1)
+#     time_input = Input(shape=input_shape)
+#     freq_input = Input(shape=input_shape)
 
-    x1 = Conv1D(filters=32, kernel_size=13, activation='linear', strides=2, padding='same')(xmul0)
-    x1 = AddGatedNoise()(x1)
-    x1 = Activation('sigmoid')(x1)
-    x1_ = Conv1D(filters=32, kernel_size=13, activation=None, strides=2, padding='same')(xmul0)
-    xmul1 = Multiply()([x1, x1_])
-    xmul1 = BatchNormalization()(xmul1)
+#     # 시간 도메인 처리
+#     x0 = Conv1D(filters=16, kernel_size=13, activation='linear', strides=2, padding='same')(time_input)
+#     x0 = AddGatedNoise()(x0)
+#     x0 = Activation('sigmoid')(x0)
+#     x0_ = Conv1D(filters=16, kernel_size=13, activation=None, strides=2, padding='same')(time_input)
+#     xmul0 = Multiply()([x0, x0_])
+#     xmul0 = BatchNormalization()(xmul0)
 
-    x2 = Conv1D(filters=64, kernel_size=13, activation='linear', strides=2, padding='same')(xmul1)
-    x2 = AddGatedNoise()(x2)
-    x2 = Activation('sigmoid')(x2)
-    x2_ = Conv1D(filters=64, kernel_size=13, activation='elu', strides=2, padding='same')(xmul1)
-    xmul2 = Multiply()([x2, x2_])
-    xmul2 = BatchNormalization()(xmul2)
+#     x1 = Conv1D(filters=32, kernel_size=13, activation='linear', strides=2, padding='same')(xmul0)
+#     x1 = AddGatedNoise()(x1)
+#     x1 = Activation('sigmoid')(x1)
+#     x1_ = Conv1D(filters=32, kernel_size=13, activation=None, strides=2, padding='same')(xmul0)
+#     xmul1 = Multiply()([x1, x1_])
+#     xmul1 = BatchNormalization()(xmul1)
 
-    # Transformer encoder를 시간 도메인에만 적용
-    position_embed = TFPositionalEncoding1D(signal_size)
-    x2_pos = position_embed(xmul2)  # Positional encoding 추가
-    for _ in range(num_transformer_blocks):
-        x2_pos = transformer_encoder(x2_pos, head_size, num_heads, ff_dim, dropout)
+#     x2 = Conv1D(filters=64, kernel_size=13, activation='linear', strides=2, padding='same')(xmul1)
+#     x2 = AddGatedNoise()(x2)
+#     x2 = Activation('sigmoid')(x2)
+#     x2_ = Conv1D(filters=64, kernel_size=13, activation='elu', strides=2, padding='same')(xmul1)
+#     xmul2 = Multiply()([x2, x2_])
+#     xmul2 = BatchNormalization()(xmul2)
 
-    # 주파수 도메인 처리 (Conv1D만 적용, attention 없음)
-    f2 = frequency_branch(freq_input, 16, 13)
+#     # Transformer encoder를 시간 도메인에만 적용
+#     position_embed = TFPositionalEncoding1D(signal_size)
+#     x2_pos = position_embed(xmul2)  # Positional encoding 추가
+#     for _ in range(num_transformer_blocks):
+#         x2_pos = transformer_encoder(x2_pos, head_size, num_heads, ff_dim, dropout)
+
+#     # 주파수 도메인 처리 (Conv1D만 적용, attention 없음)
+#     f2 = frequency_branch(freq_input, 16, 13)
     
-    for _ in range(num_transformer_blocks):
-        f2 = frequency_encoder(f2, ff_dim, kernel_size=3, dropout=0.1)
+#     for _ in range(num_transformer_blocks):
+#         f2 = frequency_encoder(f2, ff_dim, kernel_size=3, dropout=0.1)
     
-    gated_output = layers.Concatenate()([x2_pos, f2])
-    # Deconvolution 과정
-    x4 = Conv1DTranspose(input_tensor=gated_output, filters=64, kernel_size=13, activation='elu', strides=1, padding='same')
-    x4 = Add()([x4, xmul2])
-    x4 = BatchNormalization()(x4)
+#     gated_output = layers.Concatenate()([x2_pos, f2])
+#     # Deconvolution 과정
+#     x4 = Conv1DTranspose(input_tensor=gated_output, filters=64, kernel_size=13, activation='elu', strides=1, padding='same')
+#     x4 = Add()([x4, xmul2])
+#     x4 = BatchNormalization()(x4)
 
-    x5 = Conv1DTranspose(input_tensor=x4, filters=32, kernel_size=13, activation='elu', strides=2, padding='same')
-    x5 = Add()([x5, xmul1])
-    x5 = BatchNormalization()(x5)
+#     x5 = Conv1DTranspose(input_tensor=x4, filters=32, kernel_size=13, activation='elu', strides=2, padding='same')
+#     x5 = Add()([x5, xmul1])
+#     x5 = BatchNormalization()(x5)
 
-    x6 = Conv1DTranspose(input_tensor=x5, filters=16, kernel_size=13, activation='elu', strides=2, padding='same')
-    x6 = Add()([x6, xmul0])
-    x6 = BatchNormalization()(x6)
+#     x6 = Conv1DTranspose(input_tensor=x5, filters=16, kernel_size=13, activation='elu', strides=2, padding='same')
+#     x6 = Add()([x6, xmul0])
+#     x6 = BatchNormalization()(x6)
 
-    x7 = Conv1DTranspose(input_tensor=x6, filters=1, kernel_size=13, activation='linear', strides=2, padding='same')
+#     x7 = Conv1DTranspose(input_tensor=x6, filters=1, kernel_size=13, activation='linear', strides=2, padding='same')
 
-    model = Model(inputs=[time_input, freq_input], outputs=x7)
-    return model
+#     model = Model(inputs=[time_input, freq_input], outputs=x7)
+#     return model
+# def apply_frequency_filter(time_features, freq_filters):
+#     phase_shifts = np.linspace(0, np.pi, num=freq_filters.shape[-1])  # 주파수 필터를 위한 위상 이동 값 생성
+#     cos_filter = np.cos(phase_shifts)  # 코사인 함수를 이용해 필터 생성
+#     freq_applied = tf.einsum('btf,f->btf', time_features, cos_filter)  # 시간 특성에 주파수 필터 적용
+#     return freq_applied
+# import tensorflow as tf
+# from tensorflow.keras.layers import Input, Conv1D, Conv1DTranspose, Add, Multiply, BatchNormalization, Activation, LayerNormalization, Concatenate, GlobalAveragePooling1D, Reshape, Dense, Lambda
+# from tensorflow.keras.models import Model
+
+# def squeeze_excite_block(input_tensor, ratio=16):
+#     """Squeeze and Excitation block."""
+#     filters = input_tensor.shape[-1]
+#     se = GlobalAveragePooling1D()(input_tensor)
+#     se = Reshape((1, filters))(se)
+#     se = Dense(filters // ratio, activation='relu')(se)
+#     se = Dense(filters, activation='sigmoid')(se)
+#     return Multiply()([input_tensor, se])
+
+# def resize_sequence(x, target):
+#     """Resize sequence length of x to match the target length using linear interpolation."""
+#     target_length = tf.shape(target)[1]
+#     resized = tf.image.resize(x, [target_length, tf.shape(x)[-1]])
+#     return resized
+
+# def match_batch_size(x, target):
+#     """Repeat or slice x to match the batch size of the target."""
+#     batch_size_target = tf.shape(target)[0]
+#     batch_size_x = tf.shape(x)[0]
+
+#     def repeat_fn():
+#         repeat_count = tf.math.floordiv(batch_size_target, batch_size_x)
+#         remainder = tf.math.mod(batch_size_target, batch_size_x)
+#         x_repeated = tf.tile(x, [repeat_count, 1, 1])
+#         x_remainder = tf.cond(
+#             tf.math.greater(remainder, 0),
+#             lambda: x[:remainder, :, :],
+#             lambda: tf.zeros_like(x[:0, :, :])
+#         )
+#         return tf.concat([x_repeated, x_remainder], axis=0)
+
+#     def slice_fn():
+#         return x[:batch_size_target, :, :]
+
+#     return tf.cond(tf.math.less(batch_size_x, batch_size_target), repeat_fn, slice_fn)
+
+# def dense_residual_block(input_tensor, filters, kernel_size, strides=1, activation='relu', block_name='block'):
+#     """A dense residual block."""
+#     x = Conv1D(filters, kernel_size, strides=strides, padding='same', activation=activation, name=f'{block_name}_conv')(input_tensor)
+#     x = BatchNormalization(name=f'{block_name}_bn')(x)
+    
+#     # Resize input_tensor to match x's shape (sequence length and channel dimension)
+#     input_resized = Conv1D(filters, kernel_size=1, padding='same', name=f'{block_name}_resize')(input_tensor)
+#     input_resized = Lambda(lambda inputs: resize_sequence(inputs[0], inputs[1]))([input_resized, x])
+    
+#     # Match the batch size explicitly if needed
+#     input_resized = Lambda(lambda inputs: match_batch_size(inputs[0], inputs[1]))([input_resized, x])
+    
+#     return Add()([x, input_resized])  # Residual Connection
+
+
+
+# def Transformer_COMBDAE_updated(signal_size=512, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0.1, ks=3):
+#     input_shape = (signal_size, 1)
+#     time_input = Input(shape=input_shape)
+#     freq_input = Input(shape=input_shape)
+
+#     # Initial Convolutional Layer
+#     x0 = Conv1D(filters=16, kernel_size=ks, activation='linear', strides=2, padding='same')(time_input)
+#     x0 = BatchNormalization()(x0)
+#     x0 = Activation('relu')(x0)
+
+#     # Depthwise Separable Convolution Layer
+#     x0 = Conv1D(filters=16, kernel_size=ks, strides=2, padding='same')(x0)
+#     x0 = BatchNormalization()(x0)
+#     x0 = Activation('relu')(x0)
+
+#     # Squeeze-and-Excitation Block
+#     x0 = squeeze_excite_block(x0)
+
+#     # Residual Block 1 with Dilated Convolution
+#     x1 = Conv1D(filters=32, kernel_size=ks, strides=1, dilation_rate=2, padding='same')(x0)
+#     x1 = BatchNormalization()(x1)
+#     x1 = Activation('relu')(x1)
+#     x1 = squeeze_excite_block(x1)
+    
+#     # Match the dimensions using 1x1 Conv1D
+#     x0_resized = Conv1D(filters=32, kernel_size=1, padding='same')(x0)
+#     x1 = Add()([x0_resized, x1])  # Residual connection
+
+#     # Residual Block 2 with Depthwise Separable Convolution
+#     x2 = Conv1D(filters=64, kernel_size=ks, strides=2, padding='same')(x1)
+#     x2 = BatchNormalization()(x2)
+#     x2 = Activation('relu')(x2)
+#     x2 = squeeze_excite_block(x2)
+
+#     # Match the sequence length using tf.image.resize
+#     x1_resized = Conv1D(filters=64, kernel_size=1, padding='same')(x1)
+#     x1_resized = Lambda(lambda inputs: resize_sequence(inputs[0], inputs[1]))([x1_resized, x2])
+
+#     # Match the batch size explicitly
+#     x2 = Lambda(lambda inputs: match_batch_size(inputs[0], inputs[1]))([x2, x1_resized])
+    
+#     # Perform the addition
+#     x2 = Add()([x1_resized, x2])
+
+#     # Adding Position Encoding
+#     position_embed = TFPositionalEncoding1D(signal_size)
+#     x2 = x2 + position_embed(x2)
+
+#     f2 = frequency_branch(freq_input, 16, 13)
+
+#     # Combining Time and Frequency Domains
+#     combined = Concatenate()([x2, f2])
+#     combined = position_embed(combined)
+
+#     # Transformer Blocks
+#     for _ in range(num_transformer_blocks):
+#         combined = transformer_encoder(combined, head_size, num_heads, ff_dim, dropout)
+
+#     x4 = combined
+
+#     # Upsampling with Transposed Convolutions
+#     x5 = Conv1DTranspose(filters=64, kernel_size=ks, activation='elu', strides=1, padding='same')(x4)
+#     x5 = BatchNormalization()(x5)
+#     x2_resized = Conv1D(filters=64, kernel_size=1, padding='same')(x2)
+#     x5_resized = Lambda(lambda inputs: resize_sequence(inputs[0], inputs[1]))([x5, x2_resized])
+#     x5 = Add()([x2_resized, x5_resized])
+
+#     x6 = Conv1DTranspose(filters=32, kernel_size=ks, activation='elu', strides=2, padding='same')(x5)
+#     x6 = BatchNormalization()(x6)
+#     x1_resized = Conv1D(filters=32, kernel_size=1, padding='same')(resize_sequence(x1, x6))
+#     x1_resized = Lambda(lambda inputs: match_batch_size(inputs[0], inputs[1]))([x1_resized, x6])
+#     x6_resized = Lambda(lambda inputs: resize_sequence(inputs[0], inputs[1]))([x1_resized, x6])
+#     x6 = Add()([x6_resized, x6])
+
+#     x7 = Conv1DTranspose(filters=16, kernel_size=ks, activation='elu', strides=2, padding='same')(x6)
+#     x7 = BatchNormalization()(x7)
+#     x0_resized = Conv1D(filters=16, kernel_size=1, padding='same')(x0)
+#     x7_resized = Lambda(lambda inputs: resize_sequence(inputs[0], inputs[1]))([x7, x0_resized])
+#     x7_resized = Lambda(lambda inputs: match_batch_size(inputs[0], inputs[1]))([x7_resized, x0_resized])
+#     x7 = Add()([x0_resized, x7_resized])
+
+#     x8 = BatchNormalization()(x7)
+#     predictions = Conv1DTranspose(filters=1, kernel_size=ks, activation='linear', strides=2, padding='same')(x8)
+
+#     model = Model(inputs=[time_input, freq_input], outputs=predictions)
+#     return model

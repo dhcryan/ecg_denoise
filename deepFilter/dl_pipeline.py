@@ -34,7 +34,7 @@ def train_dl(Dataset, experiment):
 
     print('Deep Learning pipeline: Training the model for exp ' + str(experiment))
     
-    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_Gated_CombDAE_freqencoder']:
+    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_COMBDAE_updated']:
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
 
         # F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
@@ -92,9 +92,9 @@ def train_dl(Dataset, experiment):
         model = Transformer_COMBDAE_FreTS()
         model_label = 'Transformer_COMBDAE_FreTS'
 
-    if experiment == 'Transformer_Gated_CombDAE_freqencoder':
-        model = Transformer_Gated_CombDAE_freqencoder()
-        model_label = 'Transformer_Gated_CombDAE_freqencoder'
+    if experiment == 'Transformer_COMBDAE_updated':
+        model = Transformer_COMBDAE_updated()
+        model_label = 'Transformer_COMBDAE_updated'
     
     print('\n ' + model_label + '\n ')
 
@@ -145,31 +145,31 @@ def train_dl(Dataset, experiment):
                                  mode='min',  # on acc has to go max
                                  save_weights_only=True)
 
-    # reduce_lr = ReduceLROnPlateau(monitor="val_loss",
-    #                             factor=0.5,           # 학습률 감소 비율은 그대로 유지
-    #                             min_delta=0.001,      # min_delta를 0.05에서 0.001로 줄여 작은 개선도 감지
-    #                             mode='min',           # val_loss 최소화를 목표로 함
-    #                             patience=10,          # patience를 2에서 10으로 늘려 학습률 감소 시점을 늦춤
-    #                             verbose=1)
-
-    # early_stop = EarlyStopping(monitor="val_loss",  
-    #                         min_delta=0.0001,       # 개선 판단을 위한 최소 변화량
-    #                         mode='min',             # val_loss 최소화를 목표로 함
-    #                         patience=200,            # patience를 50에서 20으로 줄여 더 빠른 조기 종료
-    #                         verbose=1)
     reduce_lr = ReduceLROnPlateau(monitor="val_loss",
-                                  factor=0.5,
-                                  min_delta=0.05,
-                                  mode='min',  # on acc has to go max
-                                  patience=2,
-                                  min_lr=minimum_lr,
-                                  verbose=1)
+                                factor=0.5,           # 학습률 감소 비율은 그대로 유지
+                                min_delta=0.005,      # min_delta를 0.05에서 0.001로 줄여 작은 개선도 감지
+                                mode='min',           # val_loss 최소화를 목표로 함
+                                patience=10,          # patience를 2에서 10으로 늘려 학습률 감소 시점을 늦춤
+                                verbose=1)
 
-    early_stop = EarlyStopping(monitor="val_loss",  # "val_loss"
-                               min_delta=0.01,
-                               mode='min',  # on acc has to go max
-                               patience=30,
-                               verbose=1)
+    early_stop = EarlyStopping(monitor="val_loss",  
+                            min_delta=0.001,       # 개선 판단을 위한 최소 변화량
+                            mode='min',             # val_loss 최소화를 목표로 함
+                            patience=50,            # patience를 50에서 20으로 줄여 더 빠른 조기 종료
+                            verbose=1)
+    # reduce_lr = ReduceLROnPlateau(monitor="val_loss",
+    #                               factor=0.5,
+    #                               min_delta=0.05,
+    #                               mode='min',  # on acc has to go max
+    #                               patience=2,
+    #                               min_lr=minimum_lr,
+    #                               verbose=1)
+
+    # early_stop = EarlyStopping(monitor="val_loss",  # "val_loss"
+    #                            min_delta=0.01,
+    #                            mode='min',  # on acc has to go max
+    #                            patience=30,
+    #                            verbose=1)
     
     tb_log_dir = './runs_' + current_date +'/' + model_label
     # 디렉토리가 존재하지 않으면 생성
@@ -186,7 +186,7 @@ def train_dl(Dataset, experiment):
 
     # GPU
     # if experiment == 'Transformer_COMBDAE_FreTS':
-    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_Gated_CombDAE_freqencoder']:
+    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_COMBDAE_updated']:
         model.fit(x=[X_train, F_train_x], y=y_train,
                 validation_data=([X_val, F_val_x], y_val),
                 batch_size=batch_size,
@@ -213,18 +213,18 @@ def train_dl(Dataset, experiment):
 def test_dl(Dataset, experiment):
 
     print('Deep Learning pipeline: Testing the model')
-
-    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_Gated_CombDAE_freqencoder']:
+# 여기선 x_test, y_test만 사용됨
+    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_COMBDAE_updated']:
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
 
         # F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
             # 시간 도메인과 주파수 도메인 데이터를 함께 분할
-        X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.3, shuffle=True, random_state=1)
-        F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
+        # X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.3, shuffle=True, random_state=1)
+        # F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
     else:
         [X_train, y_train, X_test, y_test] = Dataset
         # 일반 모델들을 위한 데이터 분할
-        X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.3, shuffle=True, random_state=1)
+        # X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.3, shuffle=True, random_state=1)
       
     batch_size = 64
 
@@ -273,9 +273,9 @@ def test_dl(Dataset, experiment):
         model = Transformer_COMBDAE_FreTS()
         model_label = 'Transformer_COMBDAE_FreTS'
                 
-    if experiment == 'Transformer_Gated_CombDAE_freqencoder':
-        model = Transformer_Gated_CombDAE_freqencoder()
-        model_label = 'Transformer_Gated_CombDAE_freqencoder'
+    if experiment == 'Transformer_COMBDAE_updated':
+        model = Transformer_COMBDAE_updated()
+        model_label = 'Transformer_COMBDAE_updated'
     print('\n ' + model_label + '\n ')
 
     model.summary()
@@ -304,7 +304,7 @@ def test_dl(Dataset, experiment):
     # load weights
     model.load_weights(model_filepath)
     
-    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_Gated_CombDAE_freqencoder']:
+    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_COMBDAE_updated']:
         # Test score
         y_pred = model.predict([X_test, F_test_x], batch_size=batch_size, verbose=1)
 

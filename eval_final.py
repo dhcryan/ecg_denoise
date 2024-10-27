@@ -23,7 +23,7 @@ if __name__ == "__main__":
                         'Vanilla L',
                         'Vanilla NL',
                         'Multibranch LANL',
-                        'Multibranch LANLD','Transformer_DAE','Transformer_COMBDAE','Transformer_Gated_CombDAE']
+                        'Multibranch LANLD','Transformer_DAE','Transformer_COMBDAE','Transformer_COMBDAE_updated']
 
     ####### LOAD EXPERIMENTS #######
 
@@ -52,15 +52,15 @@ if __name__ == "__main__":
         test_Multibranch_LANLD = pickle.load(input)
     # Load Results Transformer_DAE
 
-    with open('1024/test_results_' + dl_experiments[6] + '.pkl', 'rb') as input:
+    with open('1027/test_results_' + dl_experiments[6] + '.pkl', 'rb') as input:
         test_Transformer_DAE = pickle.load(input)
 
     # Load Results Transformer_FDAE
-    with open('1024/test_results_' + dl_experiments[7] + '.pkl', 'rb') as input:
+    with open('1027/test_results_' + dl_experiments[7] + '.pkl', 'rb') as input:
         test_Transformer_COMBDAE = pickle.load(input)
             
-    with open('1023/test_results_' + dl_experiments[8] + '.pkl', 'rb') as input:
-        test_Transformer_Gated_CombDAE_freqencoder = pickle.load(input)   
+    with open('1027/test_results_' + dl_experiments[8] + '.pkl', 'rb') as input:
+        test_Transformer_COMBDAE_updated = pickle.load(input)   
         
         
     # Load Result FIR Filter
@@ -193,7 +193,7 @@ if __name__ == "__main__":
 
     # Transformer_FDAE
 
-    [X_test, y_test, y_pred] = test_Transformer_Gated_CombDAE_freqencoder
+    [X_test, y_test, y_pred] = test_Transformer_COMBDAE_updated
 
     SSD_values_DL_exp_7 = SSD(y_test, y_pred)
 
@@ -309,7 +309,6 @@ if __name__ == "__main__":
     
     # timing_var = ['training', 'test']
     # generate_table_time(timing_var, timing, Exp_names, gpu=True)
-    
     
     rnd_test = np.load('rnd_test.npy')
     # print(rnd_test.shape)
@@ -483,10 +482,10 @@ if __name__ == "__main__":
     generate_boxplot(CORR_all, Exp_names, 'Cosine Similarity (0-1)', log=False, save_dir=save_directory, filename=filename_cos_box, set_x_axis_size=(0, 1))
     
     print("Generating SNR plots...")
-    generate_hboxplot(SNR_all, Exp_names, 'SNR (dB)', log=False, save_dir=save_directory, filename=filename_snr_hbox, set_x_axis_size=(-30, 30))
-    generate_violinplots(SNR_all, Exp_names, 'SNR (dB)', log=False, save_dir=save_directory, filename=filename_snr_violin, set_x_axis_size=(-30, 30))
-    generate_barplot(SNR_all, Exp_names, 'SNR (dB)', log=False, save_dir=save_directory, filename=filename_snr_bar, set_x_axis_size=(-30, 30))
-    generate_boxplot(SNR_all, Exp_names, 'SNR (dB)', log=False, save_dir=save_directory, filename=filename_snr_box, set_x_axis_size=(-30, 30))
+    generate_hboxplot(SNR_all, Exp_names, 'SNR (dB)', log=False, save_dir=save_directory, filename=filename_snr_hbox, set_x_axis_size=(-20, 25))
+    generate_violinplots(SNR_all, Exp_names, 'SNR (dB)', log=False, save_dir=save_directory, filename=filename_snr_violin, set_x_axis_size=(-20, 25))
+    generate_barplot(SNR_all, Exp_names, 'SNR (dB)', log=False, save_dir=save_directory, filename=filename_snr_bar, set_x_axis_size=(-20, 25))
+    generate_boxplot(SNR_all, Exp_names, 'SNR (dB)', log=False, save_dir=save_directory, filename=filename_snr_box, set_x_axis_size=(-20, 25))
     
     # Test signal plotting
     signals_index = np.array([110, 210, 410, 810, 1610, 3210, 6410, 12810]) + 10

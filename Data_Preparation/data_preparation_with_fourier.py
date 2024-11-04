@@ -122,6 +122,7 @@ def Data_Preparation_with_Fourier(samples, fs=360):
 
         # 노이즈 조합도 순차적으로 선택, 주기적으로 변화를 줌 (매 8회 주기)
         noise_combination_idx = (beat_idx % 7) + 1  # 1부터 7까지 순차적으로 선택
+        # noise_combination_idx = 3  # 1부터 7까지 순차적으로 선택        
         noise = combined_noise[selected_channel][:, noise_combination_idx]
         noise_segment = noise[noise_index:noise_index + samples]
         beat_max_value = np.max(beat) - np.min(beat)

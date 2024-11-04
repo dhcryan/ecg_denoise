@@ -1197,6 +1197,167 @@ import tensorflow as tf
 from tensorflow.keras.layers import Input, Conv1D, Multiply, BatchNormalization, Activation, Dense, Concatenate, Add
 from tensorflow.keras.models import Model
 
+def cross_attention_transformer(query,key,value,head_size,num_heads,ff_dim,dropout=0):
+    # 레이어 정규화
+    query_norm = layers.LayerNormalization(epsilon=1e-6)(query)
+    key_norm = layers.LayerNormalization(epsilon=1e-6)(key)
+    value_norm = layers.LayerNormalization(epsilon=1e-6)(value)
+
+    # 멀티헤드 어텐션
+    x = layers.MultiHeadAttention(
+        key_dim=head_size, num_heads=num_heads, dropout=dropout)(
+        query=query_norm, key=key_norm, value=value_norm)
+    x = layers.Dropout(dropout)(x)
+    res = x + query  # 잔차 연결 (Residual connection)
+
+    # 피드포워드 네트워크
+    x = layers.LayerNormalization(epsilon=1e-6)(res)
+    x = layers.Conv1D(filters=ff_dim, kernel_size=1, activation="relu")(x)
+    x = layers.Dropout(dropout)(x)
+    x = layers.Conv1D(filters=query.shape[-1], kernel_size=1)(x)
+    return x + res
+
+# time domain을 query로, freq domain을 key, value로  # AutoEncoder 구조, 각각의 domain은 conv + self-attention을 거친 후 cross-attention
+sigLen=512
+def Transformer_COMBDAE_updated(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_transformer_blocks=6, dropout=0):   # proposed3 model
+    input_shape = (signal_size, 1)
+    time_input = Input(shape=input_shape)
+    
+    # 주파수 도메인 입력
+    freq_input = Input(shape=input_shape)
+    freq_input_sliced = Lambda(lambda x: x[:, :256, :])(freq_input)
+
+    x0 = Conv1D(filters=16,
+                input_shape=(input_shape, 1),
+                kernel_size=ks,
+                activation='linear', 
+                strides=2,
+                padding='same')(time_input)
+    
+
+    x0 = AddGatedNoise()(x0)
+
+    x0 = layers.Activation('sigmoid')(x0)
+    # x0 = Dropout(0.3)(x0)
+    x0_ = Conv1D(filters=16,
+               input_shape=(input_shape, 1),
+               kernel_size=ks,
+               activation=None,
+               strides=2,
+               padding='same')(time_input)
+    # x0_ = Dropout(0.3)(x0_)
+    xmul0 = Multiply()([x0,x0_])
+
+    xmul0 = BatchNormalization()(xmul0)
+
+    x1 = Conv1D(filters=32,
+                kernel_size=ks,
+                activation='linear',
+                strides=2,
+                padding='same')(xmul0)
+
+    x1 = AddGatedNoise()(x1)
+    x1 = layers.Activation('sigmoid')(x1)
+
+    # x1 = Dropout(0.3)(x1)
+    x1_ = Conv1D(filters=32,
+               kernel_size=ks,
+               activation=None,
+               strides=2,
+               padding='same')(xmul0)
+    # x1_ = Dropout(0.3)(x1_)
+    xmul1 = Multiply()([x1, x1_])
+    xmul1 = BatchNormalization()(xmul1)
+
+    x2 = Conv1D(filters=64,
+               kernel_size=ks,
+               activation='linear',
+               strides=2,
+               padding='same')(xmul1)
+    x2 = AddGatedNoise()(x2)
+    x2 = layers.Activation('sigmoid')(x2)
+    # x2 = Dropout(0.3)(x2)
+    x2_ = Conv1D(filters=64,
+               kernel_size=ks,
+               activation='elu',
+               strides=2,
+               padding='same')(xmul1)
+    # x2_ = Dropout(0.3)(x2_)
+    xmul2 = Multiply()([x2, x2_])
+
+    xmul2 = BatchNormalization()(xmul2)
+
+    time_domain = xmul2
+    
+    # time_domain을 Self-Attention
+    pos_encoding = TFPositionalEncoding1D(signal_size)
+    time_domain = time_domain + pos_encoding(time_domain) 
+
+    for _ in range(num_transformer_blocks): # self-Attention
+        time_domain = transformer_encoder(time_domain, head_size, num_heads, ff_dim, dropout)
+    
+    freq_domain = frequency_branch(freq_input_sliced, 16, 13)
+    pos_encoding = TFPositionalEncoding1D(signal_size)
+    freq_domain = freq_domain + pos_encoding(freq_domain) 
+
+    for _ in range(num_transformer_blocks): # self-Attention
+        freq_domain = transformer_encoder(freq_domain, head_size, num_heads, ff_dim, dropout)
+    
+    # time을 query로, freq을 key, value로 self-attention
+    for _ in range(num_transformer_blocks):
+        x = cross_attention_transformer(time_domain, freq_domain, freq_domain, head_size, num_heads, ff_dim, dropout)
+    
+    # f1 = frequency_branch(f0, 32)
+    # f2 = frequency_branch(f1, 64)    
+    # 시간 및 주파수 도메인 특성 결합
+    # combined = layers.Concatenate()([xmul2, f2])    
+    
+    # position_embed = TFPositionalEncoding1D(signal_size)
+    # x3 = combined+position_embed(combined)
+    
+
+    # x = layers.GlobalAvgPool1D(data_format='channels_first')(x)
+    # x4 = x4+xmul2
+    
+    x4 = x
+    x5 = Conv1DTranspose(input_tensor=x4,
+                        filters=64,
+                        kernel_size=ks,
+                        activation='elu',
+                        strides=1,
+                        padding='same')
+    x5 = x5+xmul2
+    x5 = BatchNormalization()(x5)
+
+    x6 = Conv1DTranspose(input_tensor=x5,
+                        filters=32,
+                        kernel_size=ks,
+                        activation='elu',
+                        strides=2,
+                        padding='same')
+    x6 = x6+xmul1
+    x6 = BatchNormalization()(x6)
+
+    x7 = Conv1DTranspose(input_tensor=x6,
+                        filters=16,
+                        kernel_size=ks,
+                        activation='elu',
+                        strides=2,
+                        padding='same')
+
+    x7 = x7 + xmul0 #res
+
+    x8 = BatchNormalization()(x7)
+    predictions = Conv1DTranspose(
+                        input_tensor=x8,
+                        filters=1,
+                        kernel_size=ks,
+                        activation='linear',
+                        strides=2,
+                        padding='same')
+
+    model = Model(inputs=[time_input, freq_input], outputs=predictions)
+    return model
 
 # def Transformer_Gated_CombDAE_freqencoder(signal_size=sigLen, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0):
 #     input_shape = (signal_size, 1)

@@ -27,41 +27,74 @@ if __name__ == "__main__":
 
     ####### LOAD EXPERIMENTS #######
 
+    # # Load Results DRNN
+    # with open('1030/test_results_' + dl_experiments[0] + '.pkl', 'rb') as input:
+    #     test_DRNN = pickle.load(input)
+
+    # # Load Results FCN_DAE
+    # with open('1030/test_results_' + dl_experiments[1] + '.pkl', 'rb') as input:
+    #     test_FCN_DAE = pickle.load(input)
+
+    # # Load Results Vanilla L
+    # with open('1030/test_results_' + dl_experiments[2] + '.pkl', 'rb') as input:
+    #     test_Vanilla_L = pickle.load(input)
+
+    # # Load Results Exp Vanilla NL
+    # with open('1030/test_results_' + dl_experiments[3] + '.pkl', 'rb') as input:
+    #     test_Vanilla_NL = pickle.load(input)
+
+    # # Load Results Multibranch LANL
+    # with open('1030/test_results_' + dl_experiments[4] + '.pkl', 'rb') as input:
+    #     test_Multibranch_LANL = pickle.load(input)
+
+    # # Load Results Multibranch LANLD
+    # with open('1030/test_results_' + dl_experiments[5] + '.pkl', 'rb') as input:
+    #     test_Multibranch_LANLD = pickle.load(input)
+    # # Load Results Transformer_DAE
+
+    # with open('1030/test_results_' + dl_experiments[6] + '.pkl', 'rb') as input:
+    #     test_Transformer_DAE = pickle.load(input)
+
+    # # Load Results Transformer_FDAE
+    # with open('1030/test_results_' + dl_experiments[7] + '.pkl', 'rb') as input:
+    #     test_Transformer_COMBDAE = pickle.load(input)
+            
+    # with open('1101/test_results_' + dl_experiments[7] + '.pkl', 'rb') as input:
+    #     test_Transformer_COMBDAE_updated = pickle.load(input)   
     # Load Results DRNN
-    with open('1006/test_results_' + dl_experiments[0] + '.pkl', 'rb') as input:
+    with open('1030/test_results_' + dl_experiments[0] + '.pkl', 'rb') as input:
         test_DRNN = pickle.load(input)
 
     # Load Results FCN_DAE
-    with open('1006/test_results_' + dl_experiments[1] + '.pkl', 'rb') as input:
+    with open('1030/test_results_' + dl_experiments[1] + '.pkl', 'rb') as input:
         test_FCN_DAE = pickle.load(input)
 
     # Load Results Vanilla L
-    with open('1006/test_results_' + dl_experiments[2] + '.pkl', 'rb') as input:
+    with open('1030/test_results_' + dl_experiments[2] + '.pkl', 'rb') as input:
         test_Vanilla_L = pickle.load(input)
 
     # Load Results Exp Vanilla NL
-    with open('1006/test_results_' + dl_experiments[3] + '.pkl', 'rb') as input:
+    with open('1030/test_results_' + dl_experiments[3] + '.pkl', 'rb') as input:
         test_Vanilla_NL = pickle.load(input)
 
     # Load Results Multibranch LANL
-    with open('1006/test_results_' + dl_experiments[4] + '.pkl', 'rb') as input:
+    with open('1030/test_results_' + dl_experiments[4] + '.pkl', 'rb') as input:
         test_Multibranch_LANL = pickle.load(input)
 
     # Load Results Multibranch LANLD
-    with open('1006/test_results_' + dl_experiments[5] + '.pkl', 'rb') as input:
+    with open('1030/test_results_' + dl_experiments[5] + '.pkl', 'rb') as input:
         test_Multibranch_LANLD = pickle.load(input)
     # Load Results Transformer_DAE
 
-    with open('1027/test_results_' + dl_experiments[6] + '.pkl', 'rb') as input:
+    with open('1030/test_results_' + dl_experiments[6] + '.pkl', 'rb') as input:
         test_Transformer_DAE = pickle.load(input)
 
     # Load Results Transformer_FDAE
-    with open('1027/test_results_' + dl_experiments[7] + '.pkl', 'rb') as input:
+    with open('1030/test_results_' + dl_experiments[7] + '.pkl', 'rb') as input:
         test_Transformer_COMBDAE = pickle.load(input)
             
-    with open('1027/test_results_' + dl_experiments[8] + '.pkl', 'rb') as input:
-        test_Transformer_COMBDAE_updated = pickle.load(input)   
-        
+    with open('1104/test_results_' + dl_experiments[8] + '.pkl', 'rb') as input:
+        test_Transformer_COMBDAE_updated = pickle.load(input)
         
     # Load Result FIR Filter
     with open('1005/test_results_FIR.pkl', 'rb') as input:

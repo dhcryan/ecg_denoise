@@ -19,8 +19,9 @@ if __name__ == "__main__":
     #                   'Vanilla L',
     #                   'Vanilla NL',
     #                   'Multibranch LANL',
-    #                   'Multibranch LANLD', 'Transformer_DAE', 'Transformer_COMBDAE', 'Transformer_COMBDAE_FreTS','Transformer_COMBDAE_updated',]
-    dl_experiments = ['Transformer_DAE', 'Transformer_COMBDAE','Transformer_COMBDAE_updated']
+    #                   'Multibranch LANLD', 'Transformer_DAE','Transformer_COMBDAE']
+    # # dl_experiments = [, 'Transformer_COMBDAE_FreTS','Transformer_COMBDAE_updated']
+    dl_experiments = ['Transformer_COMBDAE_updated']
 
     train_time_list = []
     test_time_list = []

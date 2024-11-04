@@ -155,7 +155,7 @@ def train_dl(Dataset, experiment):
     early_stop = EarlyStopping(monitor="val_loss",  
                             min_delta=0.001,       # 개선 판단을 위한 최소 변화량
                             mode='min',             # val_loss 최소화를 목표로 함
-                            patience=50,            # patience를 50에서 20으로 줄여 더 빠른 조기 종료
+                            patience=30,            # patience를 50에서 20으로 줄여 더 빠른 조기 종료
                             verbose=1)
     # reduce_lr = ReduceLROnPlateau(monitor="val_loss",
     #                               factor=0.5,

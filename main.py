@@ -8,6 +8,8 @@ from utils.visualization import visualize_multiple_beats, visualize_signals, plo
 # from utils import visualization as vs
 from Data_Preparation.data_preparation import Data_Preparation
 from Data_Preparation.data_preparation_with_fourier import Data_Preparation_with_Fourier
+from Data_Preparation.data_preparation_only_fourier import Data_Preparation_only_Fourier
+# from Data_Preparation.data_preparation_with_fourier import Data_Preparation_with_Wavelet
 from digitalFilters.dfilters import FIR_test_Dataset, IIR_test_Dataset
 from deepFilter.dl_pipeline import train_dl, test_dl
 
@@ -19,9 +21,9 @@ if __name__ == "__main__":
     #                   'Vanilla L',
     #                   'Vanilla NL',
     #                   'Multibranch LANL',
-    #                   'Multibranch LANLD', 'Transformer_DAE','Transformer_COMBDAE']
+    #                   'Multibranch LANLD', 'AttentionSkipDAE','Transformer_DAE','Transformer_COMBDAE']
     # # dl_experiments = [, 'Transformer_COMBDAE_FreTS','Transformer_COMBDAE_updated']
-    dl_experiments = ['Transformer_COMBDAE_updated']
+    dl_experiments = ['Transformer_COMBDAE']
 
     train_time_list = []
     test_time_list = []
@@ -34,6 +36,12 @@ if __name__ == "__main__":
         if experiment in ['Transformer_COMBDAE', 'Transformer_COMBDAE_FreTS', 'Transformer_COMBDAE_updated']:
             Dataset, valid_train_indices, valid_test_indices, noise_indices_train, noise_indices_test = Data_Preparation_with_Fourier(samples=512, fs=360)
             X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y = Dataset
+        # if experiment in ['Transformer_COMBDAE_updated']:
+        #     Dataset, valid_train_indices, valid_test_indices, noise_indices_train, noise_indices_test = Data_Preparation_with_Wavelet(samples=512, fs=360, wavelet='db4', level=4)
+        #     X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y = Dataset
+        # elif experiment in ['Transformer_FreqDAE']:
+        #     Dataset, valid_train_indices, valid_test_indices, noise_indices_train, noise_indices_test = Data_Preparation_only_Fourier(samples=512, fs=360)
+        #     X_train, y_train, X_test, y_test = Dataset            
         else:
             Dataset, valid_train_indices, valid_test_indices, noise_indices_train, noise_indices_test = Data_Preparation(samples=512)
             X_train, y_train, X_test, y_test = Dataset

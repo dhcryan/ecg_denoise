@@ -1,12 +1,39 @@
-import glob
 import numpy as np
+from scipy.fft import fft
+import glob
 from scipy.signal import resample_poly
 import wfdb
 import math
 import _pickle as pickle
 
+def make_fourier(inputs, n, fs):
+    """
+    주파수 도메인 정보 추출 및 time-domain과 같은 shape으로 만듦.
+    
+    Parameters:
+    inputs: 입력 신호 (원본 신호, 2D 배열 - (배치 크기, 샘플 수))
+    n: FFT 샘플 수
+    fs: 샘플링 주파수 (예: 360 Hz)
+    
+    Returns:
+    주파수 도메인에서 얻은 신호 (FFT), time-domain과 동일한 크기
+    """
+    T = n / fs
+    k = np.arange(n)
+    freq = k / T
+    freq = freq[range(int(n / 2))]
 
-def Data_Preparation(samples):
+    signal_list = []
+    for i in range(inputs.shape[0]):
+        y = inputs[i, :]
+        Y = fft(y) / n  # FFT 수행 후 정규화
+        Y = np.abs(Y[range(int(n / 2))])
+        # Magnitude 값을 두 배로 늘려 time-domain과 동일한 shape으로 맞춤 (512)
+        Y_full = np.hstack([Y, Y])  # Duplicate to match time-domain size
+        signal_list.append(Y_full)
+
+    return np.asarray(signal_list)
+def Data_Preparation_only_Fourier(samples, fs=360):
     print('Getting the Data ready ...')
 
     # Set random seed for reproducibility
@@ -18,7 +45,6 @@ def Data_Preparation(samples):
         qtdb = pickle.load(input)
 
     print(f"[INFO] Loaded QTDatabase with {len(qtdb.keys())} signals")
-
     # Load combined noise
     with open('data/CombinedNoise.pkl', 'rb') as input:
         combined_noise = pickle.load(input)
@@ -33,19 +59,23 @@ def Data_Preparation(samples):
 
     beats_train = []
     beats_test = []
+    fourier_train_x = []
+    fourier_test_x = []
+    fourier_train_y = []
+    fourier_test_y = []
     valid_train_indices = []  # To keep track of valid indices in training data
     valid_test_indices = []   # To keep track of valid indices in test data
+    # 노이즈 인덱스 저장 리스트
+    noise_indices_train = []
+    noise_indices_test = []
     sn_train = []
     sn_test = []
-    noise_indices_train = []
-    noise_indices_test = []    
     
     skip_beats = 0
-    # samples = 512
     qtdb_keys = list(qtdb.keys())
 
-    print(f"[INFO] Processing QTDatabase, {len(qtdb_keys)} signals to process.")
-# b_np.shape는 (512,)로, 패딩을 포함한 전체 샘플 크기가 512임을 알 수 있습니다.
+    print(f"[INFO] Processing QTDatabase, {len(qtdb.keys())} signals to process.")
+
     for signal_name in qtdb_keys:
         for b_idx, b in enumerate(qtdb[signal_name]):
             b_np = np.zeros(samples)
@@ -55,15 +85,19 @@ def Data_Preparation(samples):
             if b_sq.shape[0] > (samples - init_padding):
                 skip_beats += 1
                 continue
-# 이 평균값을 b_sq의 각 값에서 빼는 과정은 신호의 중앙화 작업입니다. 즉, 신호의 값들이 배열의 양 끝 값의 평균을 기준으로 대칭적으로 배치되도록 변환됩니다.
-# 이 계산을 통해 신호의 첫 값과 마지막 값에 대한 편향을 제거하고, 신호를 중앙으로 이동시키는 효과가 있습니다.
+
             b_np[init_padding:b_sq.shape[0] + init_padding] = b_sq - (b_sq[0] + b_sq[-1]) / 2
+
+            # Fourier 변환 적용 (주파수 도메인 정보, time-domain과 동일한 shape으로)
+            fourier_transformed_y = make_fourier(b_np.reshape(1, -1), samples, fs)
 
             if signal_name in test_set:
                 beats_test.append(b_np)
+                fourier_test_y.append(fourier_transformed_y[0])  # Append the single batch
                 valid_test_indices.append(len(beats_test) - 1)  # Track valid test beat index
             else:
                 beats_train.append(b_np)
+                fourier_train_y.append(fourier_transformed_y[0])  # Append the single batch
                 valid_train_indices.append(len(beats_train) - 1)  # Track valid train beat index
 
         print(f"[DEBUG] Processed signal {signal_name}, total beats in train: {len(beats_train)}, total beats in test: {len(beats_test)}")
@@ -73,21 +107,20 @@ def Data_Preparation(samples):
     #####################################
     print(f"[INFO] Adding noise to train and test sets")
     # Random scaling factor for train and test
-    # size=len(beats_train): beats_train의 길이만큼 난수를 생성합니다. 즉, beats_train에 있는 심박 데이터의 개수와 동일한 수의 난수를 생성합니다.
     rnd_train = np.random.randint(low=20, high=200, size=len(beats_train)) / 100
     noise_index = 0
+    # To ensure equal selection of channels
     # Adding noise to train
-    # https://chatgpt.com/g/g-cKXjWStaE-python/c/66e1471b-57b4-8006-b921-233e7803fcab
     for beat_idx, beat in enumerate(beats_train):
+        # if np.random.rand() < channel_ratio:
         if (beat_idx // 10) % 2 == 0:
             selected_channel = beat_idx % 2  # 0과 1을 번갈아 선택
         else:
             selected_channel = (beat_idx + 1) % 2  # 반대 순서로 선택
 
         # 노이즈 조합도 순차적으로 선택, 주기적으로 변화를 줌 (매 8회 주기)
-        # noise_combination_idx = (beat_idx % 7) + 1  # 1부터 7까지 순차적으로 선택
-        noise_combination_idx = 0
-        # noise_combination_idx=7
+        noise_combination_idx = (beat_idx % 7) + 1  # 1부터 7까지 순차적으로 선택
+        # noise_combination_idx = 3  # 1부터 7까지 순차적으로 선택        
         noise = combined_noise[selected_channel][:, noise_combination_idx]
         noise_segment = noise[noise_index:noise_index + samples]
         beat_max_value = np.max(beat) - np.min(beat)
@@ -96,19 +129,19 @@ def Data_Preparation(samples):
         alpha = rnd_train[beat_idx] / Ase
         signal_noise = beat + alpha * noise_segment
         sn_train.append(signal_noise)
+        fourier_transformed_x = make_fourier(signal_noise.reshape(1, -1), samples, fs)  # X에 대한 Fourier 변환
+        fourier_train_x.append(fourier_transformed_x[0])  # Append the single batch
         noise_indices_train.append(noise_combination_idx)  # 노이즈 인덱스 저장
         noise_index += samples
         if noise_index > (len(noise) - samples):
             noise_index = 0
 
-                
     # Adding noise to test
     noise_index = 0
     rnd_test = np.random.randint(low=20, high=200, size=len(beats_test)) / 100
-    # Saving the random array so we can use it on the amplitude segmentation tables
     np.save('rnd_test.npy', rnd_test)
     print('rnd_test shape: ' + str(rnd_test.shape))
-    
+        
     for beat_idx, beat in enumerate(beats_test):
         # if np.random.rand() < channel_ratio:
         if (beat_idx // 10) % 2 == 0:
@@ -116,9 +149,7 @@ def Data_Preparation(samples):
         else:
             selected_channel = (beat_idx + 1) % 2  # 반대 순서로 선택
         # 노이즈 조합도 순차적으로 선택, 주기적으로 변화를 줌 (매 8회 주기)
-        # noise_combination_idx = (beat_idx % 7) + 1  # 1부터 7까지 순차적으로 선택
-        noise_combination_idx = 0
-        # noise_combination_idx=7
+        noise_combination_idx = (beat_idx % 7) + 1  # 1부터 7까지 순차적으로 선택
         noise = combined_noise[selected_channel][:, noise_combination_idx]
         noise_segment = noise[noise_index:noise_index + samples]
         beat_max_value = np.max(beat) - np.min(beat)
@@ -127,25 +158,43 @@ def Data_Preparation(samples):
         alpha = rnd_test[beat_idx] / Ase
         signal_noise = beat + alpha * noise_segment
         sn_test.append(signal_noise)
+        fourier_transformed_x = make_fourier(signal_noise.reshape(1, -1), samples, fs)  # X에 대한 Fourier 변환
+        fourier_test_x.append(fourier_transformed_x[0])  # Append the single batch
         noise_indices_test.append(noise_combination_idx)  # 노이즈 인덱스 저장
         noise_index += samples
         if noise_index > (len(noise) - samples):
             noise_index = 0
+
+
     X_train = np.array(sn_train)[valid_train_indices]  # Match noisy and original beats
     X_test = np.array(sn_test)[valid_test_indices]
 
     y_train = np.array(beats_train)[valid_train_indices]  # Match noisy and original beats
     y_test = np.array(beats_test)[valid_test_indices]
 
+    # Fourier 정보도 포함된 주파수 도메인 데이터셋 생성
+    F_train_x = np.array(fourier_train_x)[valid_train_indices]
+    F_test_x = np.array(fourier_test_x)[valid_test_indices]
+    F_train_y = np.array(fourier_train_y)[valid_train_indices]
+    F_test_y = np.array(fourier_test_y)[valid_test_indices]
+
+    # Shape을 time-domain과 동일하게 확장
     X_train = np.expand_dims(X_train, axis=2)
     y_train = np.expand_dims(y_train, axis=2)
 
     X_test = np.expand_dims(X_test, axis=2)
     y_test = np.expand_dims(y_test, axis=2)
 
-    Dataset = [X_train, y_train, X_test, y_test]
+    F_train_x = np.expand_dims(F_train_x, axis=2)
+    F_train_y = np.expand_dims(F_train_y, axis=2)
+    
+    F_test_x = np.expand_dims(F_test_x, axis=2)
+    F_test_y = np.expand_dims(F_test_y, axis=2)
+
+    Dataset = [F_train_x, F_train_y, F_test_x, F_test_y]
+    
     print(f"[INFO] Final shapes -> X_train: {X_train.shape}, y_train: {y_train.shape}, X_test: {X_test.shape}, y_test: {y_test.shape}")
+    print(f"[INFO] Fourier shapes -> F_train_x: {F_train_x.shape}, F_train_y: {F_train_y.shape}, F_test_x: {F_test_x.shape}, F_test_y: {F_test_y.shape}")
     print('Dataset ready to use.')
 
     return Dataset, valid_train_indices, valid_test_indices, noise_indices_train, noise_indices_test
-

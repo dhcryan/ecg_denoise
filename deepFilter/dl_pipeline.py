@@ -36,11 +36,14 @@ def train_dl(Dataset, experiment):
     
     if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_COMBDAE_updated']:
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
-
         # F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
             # 시간 도메인과 주파수 도메인 데이터를 함께 분할
         X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.3, shuffle=True, random_state=1)
         F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
+    # elif experiment == 'Transformer_FreqDAE':
+    #     [X_train, y_train, X_test, y_test] = Dataset
+    #     # 일반 모델들을 위한 데이터 분할
+    #     X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.3, shuffle=True, random_state=1)
     else:
         [X_train, y_train, X_test, y_test] = Dataset
         # 일반 모델들을 위한 데이터 분할
@@ -79,6 +82,11 @@ def train_dl(Dataset, experiment):
         model = deep_filter_model_I_LANL_dilated()
         model_label = 'Multibranch_LANLD'
         
+    if experiment == 'AttentionSkipDAE':
+        # Inception-like linear and non linear dilated
+        model = AttentionSkipDAE()
+        model_label = 'AttentionSkipDAE'
+    
     if experiment == 'Transformer_DAE':
         # Transformer_FDAE
         model = Transformer_DAE()
@@ -95,7 +103,10 @@ def train_dl(Dataset, experiment):
     if experiment == 'Transformer_COMBDAE_updated':
         model = Transformer_COMBDAE_updated()
         model_label = 'Transformer_COMBDAE_updated'
-    
+        
+    if experiment == 'Transformer_FreqDAE':
+        model = Transformer_FreqDAE()
+        model_label = 'Transformer_FreqDAE'
     print('\n ' + model_label + '\n ')
 
     model.summary()
@@ -133,7 +144,7 @@ def train_dl(Dataset, experiment):
 
     # 체크포인트 파일 경로 설정
     model_dir = current_date
-    model_filepath = os.path.join(model_dir, model_label + '_weights.best.hdf5')
+    model_filepath = os.path.join(model_dir, f"{model_label}_weights.best.hdf5")
 
     # 디렉토리가 존재하지 않으면 생성
     if not os.path.exists(model_dir):
@@ -221,6 +232,9 @@ def test_dl(Dataset, experiment):
             # 시간 도메인과 주파수 도메인 데이터를 함께 분할
         # X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.3, shuffle=True, random_state=1)
         # F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
+    # elif experiment == 'Transformer_FreqDAE':
+    #     [X_train, y_train, X_test, y_test] = Dataset
+        # 일반 모델들을 위한 데이터 분할
     else:
         [X_train, y_train, X_test, y_test] = Dataset
         # 일반 모델들을 위한 데이터 분할
@@ -260,6 +274,11 @@ def test_dl(Dataset, experiment):
         # Inception-like linear and non linear dilated
         model = deep_filter_model_I_LANL_dilated()
         model_label = 'Multibranch_LANLD'
+
+    if experiment == 'AttentionSkipDAE':
+        # Inception-like linear and non linear dilated
+        model = AttentionSkipDAE()
+        model_label = 'AttentionSkipDAE'
         
     if experiment == 'Transformer_DAE':
         model = Transformer_DAE()
@@ -276,6 +295,10 @@ def test_dl(Dataset, experiment):
     if experiment == 'Transformer_COMBDAE_updated':
         model = Transformer_COMBDAE_updated()
         model_label = 'Transformer_COMBDAE_updated'
+        
+    if experiment == 'Transformer_FreqDAE':
+        model = Transformer_FreqDAE()
+        model_label = 'Transformer_FreqDAE'
     print('\n ' + model_label + '\n ')
 
     model.summary()

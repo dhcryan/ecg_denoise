@@ -2,7 +2,7 @@ import keras
 from keras.models import Sequential, Model
 from keras.layers import Dense, Conv1D, Flatten, Dropout, BatchNormalization,\
                          concatenate, Activation, Input, Conv2DTranspose, Lambda, LSTM, GRU,Reshape, Embedding, GlobalAveragePooling1D,\
-                         Multiply,Bidirectional
+                         Multiply,Bidirectional,Layer, MaxPool1D, Conv1DTranspose
 import keras.backend as K
 from keras import layers
 import tensorflow as tf
@@ -514,26 +514,324 @@ def DRRN_denoising():
     return model
 
 sigLen = 512
-def Conv1DTranspose(input_tensor, filters, kernel_size, strides=2, activation='relu', padding='same'):
-    """
-        https://stackoverflow.com/a/45788699
-
-        input_tensor: tensor, with the shape (batch_size, time_steps, dims)
-        filters: int, output dimension, i.e. the output tensor will have the shape of (batch_size, time_steps, filters)
-        kernel_size: int, size of the convolution kernel
-        strides: int, convolution step size
-        padding: 'same' | 'valid'
-    """
-    x = Lambda(lambda x: tf.expand_dims(x, axis=2))(input_tensor)
-    x = Conv2DTranspose(filters=filters,
-                        kernel_size=(kernel_size, 1),
-                        activation=activation,
-                        strides=(strides, 1),
-                        padding=padding)(x)
-    x = Lambda(lambda x: tf.squeeze(x, axis=2))(x)
-    return x
 
 ##########################################################################
+class SpatialGateDep(Layer):
+    def __init__(self, filters, kernel_size, input_shape=None, activation='sigmoid', transpose=False):
+        super(SpatialGateDep, self).__init__()
+        self.transpose = transpose
+        self.conv = Conv1D(filters, kernel_size, input_shape=input_shape, activation=activation)
+
+    def call(self, x):
+        #if transpose, switch the data to (batch, steps, channels)
+        if self.transpose:
+            x = tf.transpose(x, [0, 2, 1])
+        avg_ = tf.reduce_mean(x, axis=-1, keepdims=True)
+        max_ = tf.reduce_max(x, axis=-1, keepdims=True)
+        x = tf.concat([avg_, max_], axis=1)
+        out = self.conv(x)
+        if self.transpose:
+            out = tf.transpose(out, [0, 2, 1])
+        return out
+
+class SpatialGate(Layer):
+    def __init__(self, filters, kernel_size, input_shape=None, activation='sigmoid', transpose=False):
+        super(SpatialGate, self).__init__()
+        self.transpose = transpose
+        self.conv = Conv1D(filters, kernel_size, padding='same',
+                           input_shape=input_shape, activation=activation)
+
+    def call(self, x):
+        #if transpose, switch the data to (batch, steps, channels)
+        if self.transpose:
+            x = tf.transpose(x, [0, 2, 1])
+        avg_ = tf.reduce_mean(x, axis=-1, keepdims=True)
+        max_ = tf.reduce_max(x, axis=-1, keepdims=True)
+        x = tf.concat([avg_, max_], axis=-1)
+        out = self.conv(x)
+        if self.transpose:
+            out = tf.transpose(out, [0, 2, 1])
+        return out
+
+########################################################
+############## IMPLEMENT CHANNEL #######################
+########################################################
+
+class ChannelGate(Layer):
+    def __init__(self, filters, kernel_size, input_shape=None, activation='sigmoid', transpose=False):
+        super(ChannelGate, self).__init__()
+        self.transpose = transpose
+        self.conv = Conv1D(filters, kernel_size,
+                           input_shape=input_shape,
+                           activation=activation,
+                           padding='same')
+
+    def call(self, x):
+        #if transpose, switch the data to (batch, steps, channels)
+        if self.transpose:
+            x = tf.transpose(x, [0, 2, 1])
+        x = tf.reduce_mean(x, axis=1, keepdims=True)
+        x = tf.transpose(x, [0, 2, 1])
+        out = self.conv(x)
+        out = tf.transpose(out, [0, 2, 1])
+        if self.transpose:
+            out = tf.transpose(out, [0, 2, 1])
+        return out
+
+########################################################
+################# IMPLEMENT CBAM #######################
+########################################################
+
+class CBAM(tf.keras.layers.Layer):
+    def __init__(self, c_filters, c_kernel, c_input, c_transpose,
+                 s_filters, s_kernel, s_input, s_transpose, spatial=True):
+        super(CBAM, self).__init__()
+        self.spatial = spatial
+        self.channel_attention = ChannelGate(c_filters, c_kernel, input_shape=c_input, transpose=c_transpose)
+        self.spatial_attention = SpatialGate(s_filters, s_kernel, input_shape=s_input, transpose=s_transpose)
+
+    def call(self, x):
+        channel_mask = self.channel_attention(x)
+        x = channel_mask * x
+        if self.spatial:
+            spatial_mask = self.spatial_attention(x)
+            x = spatial_mask * x
+        return x
+    
+
+class AttentionBlock(tf.keras.layers.Layer):
+    def __init__(self, signal_size, channels, kernel_size=16,
+                 input_size=None, activation='LeakyReLU'):
+        super(AttentionBlock, self).__init__()
+        if input_size is not None:
+            self.conv = Conv1D(
+                channels,
+                kernel_size,
+                input_shape=input_size,
+                padding='same',
+                activation=activation
+            )
+        else:
+            self.conv = Conv1D(
+                channels,
+                kernel_size,
+                padding='same',
+                activation=activation
+            )
+        self.attention = CBAM(
+            1,
+            3,
+            (channels, 1),
+            False,
+            1,
+            7,
+            (signal_size, 1),
+            False
+        )
+        self.maxpool = MaxPool1D(
+            padding='same',
+            strides=2
+        )
+
+    def call(self, x):
+        output = self.conv(x)
+        output = self.attention(output)
+        output = self.maxpool(output)
+        return output
+
+class AttentionBlockBN(tf.keras.layers.Layer):
+    def __init__(self, signal_size, channels, kernel_size=16,
+                 input_size=None):
+        super(AttentionBlockBN, self).__init__()
+        if input_size is not None:
+            self.conv = Conv1D(
+                channels,
+                kernel_size,
+                input_shape=input_size,
+                padding='same',
+                activation=None
+            )
+        else:
+            self.conv = Conv1D(
+                channels,
+                kernel_size,
+                padding='same',
+                activation=None
+            )
+        self.activation = tf.keras.layers.LeakyReLU()
+        self.bn = BatchNormalization()
+        self.dp = Dropout(rate=0.001) #rate=0.1 for qtdb
+        self.attention = CBAM(
+            1,
+            3,
+            (channels, 1),
+            False,
+            1,
+            7,
+            (signal_size, 1),
+            False
+        )
+        self.maxpool = MaxPool1D(
+            padding='same',
+            strides=2
+        )
+
+    def call(self, x):
+        output = self.conv(x)
+        output = self.activation(self.bn(output))
+        output = self.dp(output)
+        output = self.attention(output)
+        output = self.maxpool(output)
+        return output
+
+class EncoderBlock(tf.keras.layers.Layer):
+    def __init__(self, signal_size, channels, kernel_size=16,
+                 input_size=None, activation='LeakyReLU'):
+        super(EncoderBlock, self).__init__()
+        if input_size is not None:
+            self.conv = Conv1D(
+                channels,
+                kernel_size,
+                input_shape=input_size,
+                padding='same',
+                activation=activation
+            )
+        else:
+            self.conv = Conv1D(
+                channels,
+                kernel_size,
+                padding='same',
+                activation=activation
+            )
+        self.maxpool = MaxPool1D(
+            padding='same',
+            strides=2
+        )
+
+    def call(self, x):
+        output = self.conv(x)
+        output = self.maxpool(output)
+        return output
+
+class AttentionDeconv(tf.keras.layers.Layer):
+    def __init__(self, signal_size, channels, kernel_size=16,
+                 input_size=None, activation='LeakyReLU',
+                 strides=2, padding='same'):
+        super(AttentionDeconv, self).__init__()
+        self.deconv = keras.layers.Conv1DTranspose(
+            channels,
+            kernel_size,
+            strides=strides,
+            padding=padding,
+            activation=activation
+        )
+        self.attention = CBAM(
+            1,
+            3,
+            (channels, 1),
+            False,
+            1,
+            7,
+            (signal_size, 1),
+            False
+        )
+
+    def call(self, x):
+        output = self.attention(self.deconv(x))
+        return output
+
+class AttentionDeconvBN(tf.keras.layers.Layer):
+    def __init__(self, signal_size, channels, kernel_size=16,
+                 input_size=None, activation='LeakyReLU',
+                 strides=2, padding='same'):
+        super(AttentionDeconvBN, self).__init__()
+        self.deconv = keras.layers.Conv1DTranspose(
+            channels,
+            kernel_size,
+            strides=strides,
+            padding=padding,
+        )
+        self.bn = BatchNormalization()
+        if activation == 'LeakyReLU':
+            self.activation = tf.keras.layers.LeakyReLU()
+        else:
+            self.activation = None
+        self.dp = Dropout(rate=0.001) #rate=0.1 for qtdb
+        self.attention = CBAM(
+            1,
+            3,
+            (channels, 1),
+            False,
+            1,
+            7,
+            (signal_size, 1),
+            False
+        )
+
+    def call(self, x):
+        output = self.deconv(x)
+        output = self.bn(output)
+        if self.activation is not None:
+            output = self.activation(output)
+        output = self.dp(output)
+        output = self.attention(output)
+        return output
+
+class AttentionDeconvECA(tf.keras.layers.Layer):
+    def __init__(self, signal_size, channels, kernel_size=16,
+                 input_size=None, activation='LeakyReLU',
+                 strides=2, padding='same'):
+        super(AttentionDeconvECA, self).__init__()
+        self.deconv = keras.layers.Conv1DTranspose(
+            channels,
+            kernel_size,
+            strides=strides,
+            padding=padding,
+            activation=activation
+        )
+        self.attention = CBAM(
+            1,
+            3,
+            (channels, 1),
+            False,
+            1,
+            7,
+            (signal_size, 1),
+            False,
+            spatial=False
+        )
+
+    def call(self, x):
+        output = self.attention(self.deconv(x))
+        return output
+
+def AttentionSkipDAE(signal_size=512):
+    input_shape = (signal_size, 1)
+    inputs = Input(shape=input_shape)
+    
+    # 인코더 부분
+    enc1 = AttentionBlock(signal_size, 16, input_size=(signal_size, 1))(inputs)
+    enc2 = AttentionBlock(signal_size//2, 32)(enc1)
+    enc3 = AttentionBlock(signal_size//4, 64)(enc2)
+    enc4 = AttentionBlock(signal_size//8, 64)(enc3)
+    enc5 = AttentionBlock(signal_size//16, 1)(enc4)  # 원래 32
+    
+    # 디코더 부분 (Skip connections 포함)
+    dec5 = AttentionDeconv(signal_size//16, 64)(enc5)
+    dec4 = AttentionDeconv(signal_size//8, 64)(Add()([dec5, enc4]))
+    dec3 = AttentionDeconv(signal_size//4, 32)(Add()([dec4, enc3]))
+    dec2 = AttentionDeconv(signal_size//2, 16)(Add()([dec3, enc2]))
+    dec1 = AttentionDeconv(signal_size, 1, activation='linear')(Add()([dec2, enc1]))
+    
+    # 모델 생성
+    model = Model(inputs=inputs, outputs=dec1)
+    
+    return model
+
+# 모델 사용 예시:
+# model = AttentionSkipDAE(signal_size=512)
+    
+##TCDAE
 
 def transformer_encoder(inputs,head_size,num_heads,ff_dim,dropout=0):
     # Normalization and Attention
@@ -882,114 +1180,571 @@ def Transformer_COMBDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,
     model = Model(inputs=[time_input, freq_input], outputs=predictions)
     return model
 
-import tensorflow as tf
-from tensorflow.keras.layers import Conv1D, BatchNormalization, Activation, Multiply, Input, Concatenate
-from tensorflow.keras.models import Model
-from tensorflow.keras import layers
 
-# Sub-Pixel Convolution layer for upsampling
-class SubPixelConv1D(tf.keras.layers.Layer):
-    def __init__(self, scale):
-        super(SubPixelConv1D, self).__init__()
-        self.scale = scale
+# from tensorflow.keras import layers, Model, Input
+# from tensorflow.keras.layers import Conv1D, BatchNormalization, Multiply, Add, Activation
 
-    def call(self, inputs):
-        batch_size, length, channels = tf.shape(inputs)[0], tf.shape(inputs)[1], tf.shape(inputs)[2]
-        reshaped = tf.reshape(inputs, (batch_size, length, channels // self.scale, self.scale))
-        return tf.reshape(tf.transpose(reshaped, perm=[0, 1, 3, 2]), (batch_size, length * self.scale, channels // self.scale))
+# def frequency_branch_processing(freq_input, filters):
+#     """
+#     이미 Fourier 처리된 주파수 입력을 더 깊게 처리하는 Dynamic Convolution 방식
+#     """
+#     x = Conv1D(filters, kernel_size=1, activation='linear', padding='same')(freq_input)
+#     x = BatchNormalization()(x)
+#     x = Activation('relu')(x)
+#     return x
 
-# Fusion Network for combining time and frequency domain features
-class FusionNetwork(tf.keras.layers.Layer):
-    def __init__(self, filters):
-        super(FusionNetwork, self).__init__()
-        self.conv1 = Conv1D(filters=filters, kernel_size=3, padding='same', activation='relu')
-        self.conv2 = Conv1D(filters=filters, kernel_size=3, padding='same', activation='relu')
+# def token_mixer_local_global(time_input, freq_features):
+#     """
+#     시간 도메인과 주파수 도메인의 특징을 통합
+#     """
+#     # 시간 도메인에서의 로컬 처리
+#     local_features = Conv1D(filters=16, kernel_size=3, padding="same", activation="relu")(time_input)
+    
+#     # 주파수 도메인에서 글로벌 특징 처리
+#     global_features = Conv1D(filters=16, kernel_size=1, padding="same", activation="relu")(freq_features)
+    
+#     # 로컬과 글로벌 특징 통합
+#     combined = layers.Concatenate()([local_features, global_features])
+#     combined = BatchNormalization()(combined)
+#     return combined
 
-    def call(self, time_features, freq_features):
-        combined = Concatenate()([time_features, freq_features])
-        x = self.conv1(combined)
-        x = self.conv2(x)
-        return x
+# def transformer_encoder_with_freq(inputs, head_size, num_heads, ff_dim, dropout=0):
+#     """
+#     Transformer 블록에 주파수 도메인 처리를 추가한 버전
+#     """
+#     # Normalization and Multi-Head Attention
+#     x = layers.LayerNormalization(epsilon=1e-6)(inputs)
+#     x = layers.MultiHeadAttention(
+#         key_dim=head_size, num_heads=num_heads, dropout=dropout)(x, x)
+#     x = layers.Dropout(dropout)(x)
+#     res = x + inputs
 
-def frequency_branch_updated(input_tensor, filters, kernel_size=13):
-    x0 = Conv1D(filters=filters, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(input_tensor)
-    x0 = Activation('sigmoid')(x0)
+#     # Frequency Enhanced FFN
+#     x = layers.LayerNormalization(epsilon=1e-6)(res)
+#     x = layers.Conv1D(filters=ff_dim, kernel_size=3, activation="relu", padding="same")(x)
+#     x = layers.Dropout(dropout)(x)
+#     x = layers.Conv1D(filters=inputs.shape[-1], kernel_size=1, padding="same")(x)
+#     return x + res
 
-    x0_ = Conv1D(filters=filters, kernel_size=kernel_size, activation=None, strides=2, padding='same')(input_tensor)
-    xmul0 = Multiply()([x0, x0_])
-    xmul0 = BatchNormalization()(xmul0)
+# # def Transformer_COMBDAE_FreqEnhanced(signal_size=512, head_size=64, num_heads=8, ff_dim=64,
+# #                                       num_transformer_blocks=6, dropout=0):
+# #     """
+# #     시간과 주파수 도메인을 모두 사용하는 SFHformer 기반 COMBDAE
+# #     """
+# def Transformer_FreqDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_transformer_blocks=6, dropout=0):   ###paper 1 model
+#     input_shape = (signal_size, 1)
+#     time_input = Input(shape=input_shape)
 
-    x1 = Conv1D(filters=filters * 2, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(xmul0)
-    x1 = Activation('sigmoid')(x1)
+#     # 주파수 도메인 입력
+#     freq_input = Input(shape=input_shape)
+#     freq_features = frequency_branch_processing(freq_input, filters=16)
 
-    x1_ = Conv1D(filters=filters * 2, kernel_size=kernel_size, activation=None, strides=2, padding='same')(xmul0)
-    xmul1 = Multiply()([x1, x1_])
-    xmul1 = BatchNormalization()(xmul1)
+#     # 시간 및 주파수 특징 결합
+#     combined_features = token_mixer_local_global(time_input, freq_features)
 
-    x2 = Conv1D(filters=filters * 4, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(xmul1)
-    x2 = Activation('sigmoid')(x2)
+#     # Transformer Blocks
+#     x = combined_features
+#     for _ in range(num_transformer_blocks):
+#         x = transformer_encoder_with_freq(x, head_size, num_heads, ff_dim, dropout)
 
-    x2_ = Conv1D(filters=filters * 4, kernel_size=kernel_size, activation='elu', strides=2, padding='same')(xmul1)
-    xmul2 = Multiply()([x2, x2_])
-    xmul2 = BatchNormalization()(xmul2)
+#     # Decoder Path
+#     x = Conv1D(filters=16, kernel_size=3, activation="relu", padding="same")(x)
+#     x = BatchNormalization()(x)
 
-    return xmul2
+#     # 최종 예측
+#     predictions = Conv1D(filters=1, kernel_size=3, activation="linear", padding="same")(x)
 
-def Transformer_COMBDAE_updated(signal_size=sigLen, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0.1):
-    input_shape = (signal_size, 1)
-    time_input = Input(shape=input_shape)
-    freq_input = Input(shape=input_shape)
+#     # 모델 정의
+#     model = Model(inputs=[time_input, freq_input], outputs=predictions)
+#     return model
+# import tensorflow as tf
+# from tensorflow.keras.layers import Input, Conv1D, BatchNormalization, Multiply, Add, Activation, Concatenate, Dropout
+# from tensorflow.keras.models import Model
+# import numpy as np
 
-    # Conv1D layers for time domain
-    x0 = Conv1D(filters=16, kernel_size=ks, activation='linear', strides=2, padding='same')(time_input)
-    x0 = Activation('sigmoid')(x0)
-    x0_ = Conv1D(filters=16, kernel_size=ks, activation=None, strides=2, padding='same')(time_input)
-    xmul0 = Multiply()([x0, x0_])
-    xmul0 = BatchNormalization()(xmul0)
+# from tensorflow.keras.layers import Layer
+# import tensorflow as tf
+# from tensorflow.keras.layers import Layer, Conv1D, BatchNormalization, Activation
+# from tensorflow.keras.activations import gelu
 
-    x1 = Conv1D(filters=32, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul0)
-    x1 = Activation('sigmoid')(x1)
-    x1_ = Conv1D(filters=32, kernel_size=ks, activation=None, strides=2, padding='same')(xmul0)
-    xmul1 = Multiply()([x1, x1_])
-    xmul1 = BatchNormalization()(xmul1)
+# class FourierUnit1D(tf.keras.layers.Layer):
+#     def __init__(self, filters, groups=4):
+#         super(FourierUnit1D, self).__init__()
+#         self.filters = filters
+#         self.groups = groups
 
-    x2 = Conv1D(filters=64, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul1)
-    x2 = Activation('sigmoid')(x2)
-    x2_ = Conv1D(filters=64, kernel_size=ks, activation='elu', strides=2, padding='same')(xmul1)
-    xmul2 = Multiply()([x2, x2_])
-    xmul2 = BatchNormalization()(xmul2)
+#         # Convolution layers for processing
+#         self.conv1 = tf.keras.layers.Conv1D(filters=self.filters * 2, kernel_size=1, strides=1, padding="same")
+#         self.bn1 = tf.keras.layers.BatchNormalization()
+#         self.conv2 = tf.keras.layers.Conv1D(filters=self.filters, kernel_size=1, strides=1, padding="same")
+#         self.bn2 = tf.keras.layers.BatchNormalization()
 
-    # Frequency branch
-    f2 = frequency_branch_updated(freq_input, filters=16, kernel_size=ks)
+#         # Dynamic weighting layer
+#         self.dynamic_weight = tf.keras.Sequential([
+#             tf.keras.layers.Conv1D(filters=self.groups, kernel_size=1, strides=1, padding="same"),
+#             tf.keras.layers.Softmax(axis=-1)
+#         ])
 
-    # Fusion Network
-    fusion_output = FusionNetwork(128)(xmul2, f2)
+#     def call(self, inputs):
+#         # FFT Transformation
+#         fft_features = tf.signal.rfft(inputs)  # Perform FFT (outputs complex numbers)
+#         real_part = tf.math.real(fft_features)
+#         imag_part = tf.math.imag(fft_features)
 
-    # Transformer Encoder Blocks
-    # Assuming TFPositionalEncoding1D and transformer_encoder are properly defined elsewhere
-    position_embed = TFPositionalEncoding1D(signal_size)
-    x3 = fusion_output + position_embed(fusion_output)
+#         # Combine real and imaginary parts
+#         combined_fft = tf.concat([real_part, imag_part], axis=-1)
 
-    for _ in range(num_transformer_blocks):
-        x3 = transformer_encoder(x3, head_size, num_heads, ff_dim, dropout)
+#         # Process through convolutional layers
+#         processed_fft = self.conv1(combined_fft)
+#         processed_fft = self.bn1(processed_fft)
+#         processed_fft = tf.keras.activations.gelu(processed_fft)
 
-    # Upsampling with Sub-Pixel Convolution
-    x4 = SubPixelConv1D(scale=2)(x3)
-    x4 = Conv1D(filters=64, kernel_size=ks, activation='elu', padding='same')(x4)
-    x4 = BatchNormalization()(x4)
+#         # Dynamic weighting
+#         dynamic_weights = self.dynamic_weight(combined_fft)
 
-    x5 = SubPixelConv1D(scale=2)(x4)
-    x5 = Conv1D(filters=32, kernel_size=ks, activation='elu', padding='same')(x5)
-    x5 = BatchNormalization()(x5)
+#         # Apply dynamic weighting
+#         weighted_fft = processed_fft * dynamic_weights
 
-    x6 = SubPixelConv1D(scale=2)(x5)
-    x6 = Conv1D(filters=16, kernel_size=ks, activation='elu', padding='same')(x6)
-    x6 = BatchNormalization()(x6)
+#         # Process back to real domain
+#         processed_real = tf.signal.irfft(tf.complex(weighted_fft[..., :self.filters], weighted_fft[..., self.filters:]),
+#                                          fft_length=[inputs.shape[1]])
+#         return processed_real
 
-    predictions = Conv1D(filters=1, kernel_size=ks, activation='linear', padding='same')(x6)
 
-    model = Model(inputs=[time_input, freq_input], outputs=predictions)
-    return model
+# def FrequencyBranch(input_tensor, filters, kernel_size=13):
+#     # 첫 번째 Conv1D 및 Fourier Unit 추가
+#     x0 = Conv1D(filters=filters, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(input_tensor)
+#     x0 = Activation('sigmoid')(x0)
+
+#     x0_ = Conv1D(filters=filters, kernel_size=kernel_size, activation=None, strides=2, padding='same')(input_tensor)
+#     xmul0 = Multiply()([x0, x0_])
+#     xmul0 = BatchNormalization()(xmul0)
+
+#     # Fourier Unit 추가 (첫 번째 단계)
+#     fourier1 = FourierUnit1D(filters)
+#     xmul0 = fourier1(xmul0)
+
+#     # 두 번째 Conv1D 및 Fourier Unit 추가
+#     x1 = Conv1D(filters=filters * 2, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(xmul0)
+#     x1 = Activation('sigmoid')(x1)
+
+#     x1_ = Conv1D(filters=filters * 2, kernel_size=kernel_size, activation=None, strides=2, padding='same')(xmul0)
+#     xmul1 = Multiply()([x1, x1_])
+#     xmul1 = BatchNormalization()(xmul1)
+
+#     # Fourier Unit 추가 (두 번째 단계)
+#     fourier2 = FourierUnit1D(filters * 2)
+#     xmul1 = fourier2(xmul1)
+
+#     # 세 번째 Conv1D 및 Fourier Unit 추가
+#     x2 = Conv1D(filters=filters * 4, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(xmul1)
+#     x2 = Activation('sigmoid')(x2)
+
+#     x2_ = Conv1D(filters=filters * 4, kernel_size=kernel_size, activation='elu', strides=2, padding='same')(xmul1)
+#     xmul2 = Multiply()([x2, x2_])
+#     xmul2 = BatchNormalization()(xmul2)
+
+#     # Fourier Unit 추가 (세 번째 단계)
+#     fourier3 = FourierUnit1D(filters * 4)
+#     xmul2 = fourier3(xmul2)
+
+#     return xmul2
+
+# def Transformer_FreqDAE(signal_size=512, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0):
+#     # Time-domain Input
+#     input_time = Input(shape=(signal_size, 1))
+
+#     # Time-domain Branch
+#     x0 = Conv1D(filters=16, kernel_size=13, strides=2, padding='same', activation='linear')(input_time)
+#     x0 = BatchNormalization()(x0)
+#     x0 = Activation('sigmoid')(x0)
+
+#     x1 = Conv1D(filters=32, kernel_size=13, strides=2, padding='same', activation='linear')(x0)
+#     x1 = BatchNormalization()(x1)
+#     x1 = Activation('sigmoid')(x1)
+
+#     x2 = Conv1D(filters=64, kernel_size=13, strides=2, padding='same', activation='linear')(x1)
+#     x2 = BatchNormalization()(x2)
+#     x2 = Activation('sigmoid')(x2)
+
+#     # Frequency-domain Branch
+#     freq_branch = FrequencyBranch(input_tensor=input_time, filters=16, kernel_size=13)
+
+#     # Combine Time and Frequency Features
+#     combined_features = tf.keras.layers.Concatenate(axis=-1)([x2, freq_branch])
+
+#     # Positional Encoding
+#     position_embed = TFPositionalEncoding1D(combined_features.shape[1])
+#     x3 = combined_features + position_embed(combined_features)
+
+#     # Transformer Encoder Blocks
+#     for _ in range(num_transformer_blocks):
+#         x3 = transformer_encoder(x3, head_size, num_heads, ff_dim, dropout)
+
+#     # Decoder Part (Upsampling)
+#     x4 = Conv1DTranspose(filters=64, kernel_size=13, strides=1, padding='same', activation='elu')(x3)
+#     x4 = BatchNormalization()(x4)
+
+#     x5 = Conv1DTranspose(filters=32, kernel_size=13, strides=2, padding='same', activation='elu')(x4)
+#     x5 = BatchNormalization()(x5)
+
+#     x6 = Conv1DTranspose(filters=16, kernel_size=13, strides=2, padding='same', activation='elu')(x5)
+#     x6 = BatchNormalization()(x6)
+
+#     predictions = Conv1DTranspose(filters=1, kernel_size=13, strides=2, padding='same', activation='linear')(x6)
+
+#     # Model
+#     model = Model(inputs=[input_time], outputs=predictions)
+#     return model
+
+# class FrequencyBranch(tf.keras.layers.Layer):
+#     def __init__(self, filters, kernel_size, strides):
+#         super(FrequencyBranch, self).__init__()
+#         self.filters = filters
+#         self.kernel_size = kernel_size
+#         self.strides = strides
+
+#         # Fourier Unit for Frequency Features
+#         self.fourier_unit = FourierUnit1D(filters=filters)
+
+#         # Convolutional layers for additional feature extraction
+#         self.conv1 = Conv1D(filters, kernel_size, strides=strides, padding='same', activation='relu')
+#         self.bn1 = BatchNormalization()
+
+#         self.conv2 = Conv1D(filters * 2, kernel_size, strides=strides, padding='same', activation='relu')
+#         self.bn2 = BatchNormalization()
+
+#     def call(self, inputs):
+#         # Process through FourierUnit
+#         fft_features = self.fourier_unit(inputs)
+
+#         # Additional convolutional feature extraction
+#         x = self.conv1(fft_features)
+#         x = self.bn1(x)
+
+#         x = self.conv2(x)
+#         x = self.bn2(x)
+
+#         return x
+
+# def Transformer_FreqDAE(signal_size=512, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0):
+#     input_shape = (signal_size, 1)
+#     input_time = Input(shape=input_shape)
+
+#     # Time-domain Branch
+#     x0 = Conv1D(filters=16, kernel_size=13, strides=2, padding='same', activation='linear')(input_time)
+#     x0 = BatchNormalization()(x0)
+#     x0 = Activation('sigmoid')(x0)
+
+#     x1 = Conv1D(filters=32, kernel_size=13, strides=2, padding='same', activation='linear')(x0)
+#     x1 = BatchNormalization()(x1)
+#     x1 = Activation('sigmoid')(x1)
+
+#     x2 = Conv1D(filters=64, kernel_size=13, strides=2, padding='same', activation='linear')(x1)
+#     x2 = BatchNormalization()(x2)
+#     x2 = Activation('sigmoid')(x2)  # Shape: (None, 64, 64)
+
+#     # Frequency-domain Branch
+#     freq_branch = FrequencyBranch(filters=64, kernel_size=13, strides=2)  # Define with required arguments
+#     freq_features = freq_branch(input_time)  # Output shape: (None, 128, 128)
+
+#     # Align shapes of time-domain and frequency-domain features
+#     freq_features_resized = tf.keras.layers.Conv1D(filters=64, kernel_size=1, padding='same')(freq_features)
+#     freq_features_resized = tf.keras.layers.Reshape((64, 64))(freq_features_resized)  # Reshape to match x2
+
+#     # Combine Time and Frequency features
+#     combined_features = tf.keras.layers.Concatenate(axis=-1)([x2, freq_features_resized])  # Shape: (None, 64, 128)
+
+#     # Positional Encoding
+#     position_embed = TFPositionalEncoding1D(128)  # Ensure embedding matches concatenated dimension
+#     position_encoding = position_embed(combined_features)
+#     x3 = combined_features + position_encoding  # Both shapes: (None, 64, 128)
+
+#     # Transformer Encoder Blocks
+#     for _ in range(num_transformer_blocks):
+#         x3 = transformer_encoder(x3, head_size, num_heads, ff_dim, dropout)
+
+#     # Upsampling and Reconstruction
+#     x4 = Conv1DTranspose(filters=64, kernel_size=13, strides=1, padding='same', activation='elu')(x3)
+#     x4 = BatchNormalization()(x4)
+
+#     x5 = Conv1DTranspose(filters=32, kernel_size=13, strides=2, padding='same', activation='elu')(x4)
+#     x5 = BatchNormalization()(x5)
+
+#     x6 = Conv1DTranspose(filters=16, kernel_size=13, strides=2, padding='same', activation='elu')(x5)
+#     x6 = BatchNormalization()(x6)
+
+#     predictions = Conv1DTranspose(filters=1, kernel_size=13, strides=2, padding='same', activation='linear')(x6)
+
+#     model = Model(inputs=[input_time], outputs=predictions)
+#     return model
+
+
+
+
+# def Transformer_FreqDAE(signal_size=512, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0):
+#     input_shape = (signal_size, 1)
+#     time_input = tf.keras.Input(shape=input_shape)
+
+#     # Time-domain processing
+#     x0 = Conv1D(16, kernel_size=13, strides=2, padding='same', activation='linear')(time_input)
+#     x0 = BatchNormalization()(x0)
+#     x0 = Activation('sigmoid')(x0)
+
+#     x1 = Conv1D(32, kernel_size=13, strides=2, padding='same', activation='linear')(x0)
+#     x1 = BatchNormalization()(x1)
+#     x1 = Activation('sigmoid')(x1)
+
+#     x2 = Conv1D(64, kernel_size=13, strides=2, padding='same', activation='linear')(x1)
+#     x2 = BatchNormalization()(x2)
+#     x2 = Activation('sigmoid')(x2)
+
+#     # Frequency-domain processing
+#     # Frequency-domain Branch
+#     # Frequency-domain Branch
+#     freq_branch_layer = FrequencyBranch(filters=16, kernel_size=13, strides=2, target_length=64)
+#     freq_features = freq_branch_layer(time_input)
+
+#     # Combine Time and Frequency features
+#     combined_features = tf.keras.layers.Concatenate(axis=-1)([x2, freq_features])  # Combine features
+#     # Positional Encoding
+#     position_embed = TFPositionalEncoding1D(signal_size)
+#     x3 = combined_features + position_embed(combined_features)
+
+#     # Transformer blocks
+#     for _ in range(num_transformer_blocks):
+#         x3 = transformer_encoder(x3, head_size, num_heads, ff_dim, dropout)
+
+#     x4 = x3
+#     x5 = Conv1DTranspose(input_tensor=x4,
+#                         filters=64,
+#                         kernel_size=ks,
+#                         activation='elu',
+#                         strides=1,
+#                         padding='same')
+#     x5 = x5+x2
+#     x5 = BatchNormalization()(x5)
+
+#     x6 = Conv1DTranspose(input_tensor=x5,
+#                         filters=32,
+#                         kernel_size=ks,
+#                         activation='elu',
+#                         strides=2,
+#                         padding='same')
+#     x6 = x6+x1
+#     x6 = BatchNormalization()(x6)
+
+#     x7 = Conv1DTranspose(input_tensor=x6,
+#                         filters=16,
+#                         kernel_size=ks,
+#                         activation='elu',
+#                         strides=2,
+#                         padding='same')
+
+#     x7 = x7 + x0 #res
+
+#     x8 = BatchNormalization()(x7)
+#     predictions = Conv1DTranspose(
+#                         input_tensor=x8,
+#                         filters=1,
+#                         kernel_size=ks,
+#                         activation='linear',
+#                         strides=2,
+#                         padding='same')
+#     model = Model(inputs=[time_input], outputs=predictions)
+#     return model
+
+# class FrequencyBranch(Layer):
+#     def __init__(self, filters, kernel_size, strides):
+#         super(FrequencyBranch, self).__init__()
+#         self.filters = filters
+#         self.kernel_size = kernel_size
+#         self.strides = strides
+
+#         # Initialize Conv1D and BatchNorm layers
+#         self.conv1 = Conv1D(filters, kernel_size, strides=strides, padding='same', activation='relu')
+#         self.bn1 = BatchNormalization()
+#         self.conv2 = Conv1D(filters * 2, kernel_size, strides=strides, padding='same', activation='relu')
+#         self.bn2 = BatchNormalization()
+#         self.conv3 = Conv1D(filters * 4, kernel_size, strides=strides, padding='same', activation='relu')
+#         self.bn3 = BatchNormalization()
+
+#     def call(self, inputs):
+#         # FFT to extract frequency domain features
+#         fft_output = tf.signal.rfft(inputs)
+#         real_part = tf.math.real(fft_output)
+#         imag_part = tf.math.imag(fft_output)
+#         fft_features = tf.concat([real_part, imag_part], axis=-1)  # Combine real and imaginary parts
+
+#         # Apply Conv1D and BatchNorm layers
+#         x = self.conv1(fft_features)
+#         x = self.bn1(x)
+#         x = self.conv2(x)
+#         x = self.bn2(x)
+#         x = self.conv3(x)
+#         x = self.bn3(x)
+
+#         # Reshape to match Time-domain shape
+#         x = tf.reshape(x, (-1, 64, 64))  # Adjust shape as needed
+#         return x
+
+# def Transformer_FreqDAE(signal_size=512, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0):
+#     input_shape = (signal_size, 1)
+#     input = Input(shape=input_shape)
+
+#     # Time-domain branch
+#     x0 = Conv1D(filters=16, kernel_size=13, strides=2, padding='same', activation='linear')(input)
+#     x0 = BatchNormalization()(x0)
+#     x0 = Activation('sigmoid')(x0)
+
+#     x1 = Conv1D(filters=32, kernel_size=13, strides=2, padding='same', activation='linear')(x0)
+#     x1 = BatchNormalization()(x1)
+#     x1 = Activation('sigmoid')(x1)
+
+#     x2 = Conv1D(filters=64, kernel_size=13, strides=2, padding='same', activation='linear')(x1)
+#     x2 = BatchNormalization()(x2)
+#     x2 = Activation('sigmoid')(x2)
+
+#     # Frequency-domain branch
+#     freq_branch_layer = FrequencyBranch(filters=16, kernel_size=13, strides=2)
+#     freq_features = freq_branch_layer(input)  # Frequency-domain features
+
+#     # Combine Time-domain and Frequency-domain features
+#     combined_features = Concatenate(axis=-1)([x2, freq_features])  # Combined output shape: (batch, 64, 128)
+
+#     # Positional Encoding
+#     position_embed = TFPositionalEncoding1D(signal_size)
+#     x3 = combined_features + position_embed(combined_features)
+
+#     # Transformer Encoder Blocks
+#     for _ in range(num_transformer_blocks):
+#         x3 = transformer_encoder(x3, head_size, num_heads, ff_dim, dropout)
+
+#     # Decoder
+#     x4 = x3
+#     x5 = Conv1DTranspose(input_tensor=x4, filters=64, kernel_size=13, activation='elu', strides=1, padding='same')
+#     x5 = BatchNormalization()(x5)
+
+#     x6 = Conv1DTranspose(input_tensor=x5, filters=32, kernel_size=13, activation='elu', strides=2, padding='same')
+#     x6 = BatchNormalization()(x6)
+
+#     x7 = Conv1DTranspose(input_tensor=x6, filters=16, kernel_size=13, activation='elu', strides=2, padding='same')
+#     x7 = BatchNormalization()(x7)
+
+#     predictions = Conv1DTranspose(input_tensor=x7, filters=1, kernel_size=13, activation='linear', strides=2, padding='same')
+
+#     model = Model(inputs=[input], outputs=predictions)
+#     return model
+
+
+# import tensorflow as tf
+# from tensorflow.keras.layers import Conv1D, BatchNormalization, Activation, Multiply, Input, Concatenate
+# from tensorflow.keras.models import Model
+# from tensorflow.keras import layers
+
+# # Sub-Pixel Convolution layer for upsampling
+# class SubPixelConv1D(tf.keras.layers.Layer):
+#     def __init__(self, scale):
+#         super(SubPixelConv1D, self).__init__()
+#         self.scale = scale
+
+#     def call(self, inputs):
+#         batch_size, length, channels = tf.shape(inputs)[0], tf.shape(inputs)[1], tf.shape(inputs)[2]
+#         reshaped = tf.reshape(inputs, (batch_size, length, channels // self.scale, self.scale))
+#         return tf.reshape(tf.transpose(reshaped, perm=[0, 1, 3, 2]), (batch_size, length * self.scale, channels // self.scale))
+
+# # Fusion Network for combining time and frequency domain features
+# class FusionNetwork(tf.keras.layers.Layer):
+#     def __init__(self, filters):
+#         super(FusionNetwork, self).__init__()
+#         self.conv1 = Conv1D(filters=filters, kernel_size=3, padding='same', activation='relu')
+#         self.conv2 = Conv1D(filters=filters, kernel_size=3, padding='same', activation='relu')
+
+#     def call(self, time_features, freq_features):
+#         combined = Concatenate()([time_features, freq_features])
+#         x = self.conv1(combined)
+#         x = self.conv2(x)
+#         return x
+
+# def frequency_branch_updated(input_tensor, filters, kernel_size=13):
+#     x0 = Conv1D(filters=filters, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(input_tensor)
+#     x0 = Activation('sigmoid')(x0)
+
+#     x0_ = Conv1D(filters=filters, kernel_size=kernel_size, activation=None, strides=2, padding='same')(input_tensor)
+#     xmul0 = Multiply()([x0, x0_])
+#     xmul0 = BatchNormalization()(xmul0)
+
+#     x1 = Conv1D(filters=filters * 2, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(xmul0)
+#     x1 = Activation('sigmoid')(x1)
+
+#     x1_ = Conv1D(filters=filters * 2, kernel_size=kernel_size, activation=None, strides=2, padding='same')(xmul0)
+#     xmul1 = Multiply()([x1, x1_])
+#     xmul1 = BatchNormalization()(xmul1)
+
+#     x2 = Conv1D(filters=filters * 4, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(xmul1)
+#     x2 = Activation('sigmoid')(x2)
+
+#     x2_ = Conv1D(filters=filters * 4, kernel_size=kernel_size, activation='elu', strides=2, padding='same')(xmul1)
+#     xmul2 = Multiply()([x2, x2_])
+#     xmul2 = BatchNormalization()(xmul2)
+
+#     return xmul2
+
+# def Transformer_COMBDAE_updated(signal_size=sigLen, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0.1):
+#     input_shape = (signal_size, 1)
+#     time_input = Input(shape=input_shape)
+#     freq_input = Input(shape=input_shape)
+
+#     # Conv1D layers for time domain
+#     x0 = Conv1D(filters=16, kernel_size=ks, activation='linear', strides=2, padding='same')(time_input)
+#     x0 = Activation('sigmoid')(x0)
+#     x0_ = Conv1D(filters=16, kernel_size=ks, activation=None, strides=2, padding='same')(time_input)
+#     xmul0 = Multiply()([x0, x0_])
+#     xmul0 = BatchNormalization()(xmul0)
+
+#     x1 = Conv1D(filters=32, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul0)
+#     x1 = Activation('sigmoid')(x1)
+#     x1_ = Conv1D(filters=32, kernel_size=ks, activation=None, strides=2, padding='same')(xmul0)
+#     xmul1 = Multiply()([x1, x1_])
+#     xmul1 = BatchNormalization()(xmul1)
+
+#     x2 = Conv1D(filters=64, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul1)
+#     x2 = Activation('sigmoid')(x2)
+#     x2_ = Conv1D(filters=64, kernel_size=ks, activation='elu', strides=2, padding='same')(xmul1)
+#     xmul2 = Multiply()([x2, x2_])
+#     xmul2 = BatchNormalization()(xmul2)
+
+#     # Frequency branch
+#     f2 = frequency_branch_updated(freq_input, filters=16, kernel_size=ks)
+
+#     # Fusion Network
+#     fusion_output = FusionNetwork(128)(xmul2, f2)
+
+#     # Transformer Encoder Blocks
+#     # Assuming TFPositionalEncoding1D and transformer_encoder are properly defined elsewhere
+#     position_embed = TFPositionalEncoding1D(signal_size)
+#     x3 = fusion_output + position_embed(fusion_output)
+
+#     for _ in range(num_transformer_blocks):
+#         x3 = transformer_encoder(x3, head_size, num_heads, ff_dim, dropout)
+
+#     # Upsampling with Sub-Pixel Convolution
+#     x4 = SubPixelConv1D(scale=2)(x3)
+#     x4 = Conv1D(filters=64, kernel_size=ks, activation='elu', padding='same')(x4)
+#     x4 = BatchNormalization()(x4)
+
+#     x5 = SubPixelConv1D(scale=2)(x4)
+#     x5 = Conv1D(filters=32, kernel_size=ks, activation='elu', padding='same')(x5)
+#     x5 = BatchNormalization()(x5)
+
+#     x6 = SubPixelConv1D(scale=2)(x5)
+#     x6 = Conv1D(filters=16, kernel_size=ks, activation='elu', padding='same')(x6)
+#     x6 = BatchNormalization()(x6)
+
+#     predictions = Conv1D(filters=1, kernel_size=ks, activation='linear', padding='same')(x6)
+
+#     model = Model(inputs=[time_input, freq_input], outputs=predictions)
+#     return model
 
 
 import tensorflow as tf
@@ -1192,6 +1947,16 @@ def Transformer_COMBDAE_FreTS(signal_size=512, head_size=64, num_heads=8, ff_dim
 
     model = Model(inputs=[time_input, freq_input], outputs=predictions)
     return model
+
+
+
+
+
+
+
+
+
+
 
 import tensorflow as tf
 from tensorflow.keras.layers import Input, Conv1D, Multiply, BatchNormalization, Activation, Dense, Concatenate, Add
@@ -1475,91 +2240,3 @@ def Transformer_COMBDAE_updated(signal_size = sigLen,head_size=64,num_heads=8,ff
     
 #     return Add()([x, input_resized])  # Residual Connection
 
-
-
-# def Transformer_COMBDAE_updated(signal_size=512, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=6, dropout=0.1, ks=3):
-#     input_shape = (signal_size, 1)
-#     time_input = Input(shape=input_shape)
-#     freq_input = Input(shape=input_shape)
-
-#     # Initial Convolutional Layer
-#     x0 = Conv1D(filters=16, kernel_size=ks, activation='linear', strides=2, padding='same')(time_input)
-#     x0 = BatchNormalization()(x0)
-#     x0 = Activation('relu')(x0)
-
-#     # Depthwise Separable Convolution Layer
-#     x0 = Conv1D(filters=16, kernel_size=ks, strides=2, padding='same')(x0)
-#     x0 = BatchNormalization()(x0)
-#     x0 = Activation('relu')(x0)
-
-#     # Squeeze-and-Excitation Block
-#     x0 = squeeze_excite_block(x0)
-
-#     # Residual Block 1 with Dilated Convolution
-#     x1 = Conv1D(filters=32, kernel_size=ks, strides=1, dilation_rate=2, padding='same')(x0)
-#     x1 = BatchNormalization()(x1)
-#     x1 = Activation('relu')(x1)
-#     x1 = squeeze_excite_block(x1)
-    
-#     # Match the dimensions using 1x1 Conv1D
-#     x0_resized = Conv1D(filters=32, kernel_size=1, padding='same')(x0)
-#     x1 = Add()([x0_resized, x1])  # Residual connection
-
-#     # Residual Block 2 with Depthwise Separable Convolution
-#     x2 = Conv1D(filters=64, kernel_size=ks, strides=2, padding='same')(x1)
-#     x2 = BatchNormalization()(x2)
-#     x2 = Activation('relu')(x2)
-#     x2 = squeeze_excite_block(x2)
-
-#     # Match the sequence length using tf.image.resize
-#     x1_resized = Conv1D(filters=64, kernel_size=1, padding='same')(x1)
-#     x1_resized = Lambda(lambda inputs: resize_sequence(inputs[0], inputs[1]))([x1_resized, x2])
-
-#     # Match the batch size explicitly
-#     x2 = Lambda(lambda inputs: match_batch_size(inputs[0], inputs[1]))([x2, x1_resized])
-    
-#     # Perform the addition
-#     x2 = Add()([x1_resized, x2])
-
-#     # Adding Position Encoding
-#     position_embed = TFPositionalEncoding1D(signal_size)
-#     x2 = x2 + position_embed(x2)
-
-#     f2 = frequency_branch(freq_input, 16, 13)
-
-#     # Combining Time and Frequency Domains
-#     combined = Concatenate()([x2, f2])
-#     combined = position_embed(combined)
-
-#     # Transformer Blocks
-#     for _ in range(num_transformer_blocks):
-#         combined = transformer_encoder(combined, head_size, num_heads, ff_dim, dropout)
-
-#     x4 = combined
-
-#     # Upsampling with Transposed Convolutions
-#     x5 = Conv1DTranspose(filters=64, kernel_size=ks, activation='elu', strides=1, padding='same')(x4)
-#     x5 = BatchNormalization()(x5)
-#     x2_resized = Conv1D(filters=64, kernel_size=1, padding='same')(x2)
-#     x5_resized = Lambda(lambda inputs: resize_sequence(inputs[0], inputs[1]))([x5, x2_resized])
-#     x5 = Add()([x2_resized, x5_resized])
-
-#     x6 = Conv1DTranspose(filters=32, kernel_size=ks, activation='elu', strides=2, padding='same')(x5)
-#     x6 = BatchNormalization()(x6)
-#     x1_resized = Conv1D(filters=32, kernel_size=1, padding='same')(resize_sequence(x1, x6))
-#     x1_resized = Lambda(lambda inputs: match_batch_size(inputs[0], inputs[1]))([x1_resized, x6])
-#     x6_resized = Lambda(lambda inputs: resize_sequence(inputs[0], inputs[1]))([x1_resized, x6])
-#     x6 = Add()([x6_resized, x6])
-
-#     x7 = Conv1DTranspose(filters=16, kernel_size=ks, activation='elu', strides=2, padding='same')(x6)
-#     x7 = BatchNormalization()(x7)
-#     x0_resized = Conv1D(filters=16, kernel_size=1, padding='same')(x0)
-#     x7_resized = Lambda(lambda inputs: resize_sequence(inputs[0], inputs[1]))([x7, x0_resized])
-#     x7_resized = Lambda(lambda inputs: match_batch_size(inputs[0], inputs[1]))([x7_resized, x0_resized])
-#     x7 = Add()([x0_resized, x7_resized])
-
-#     x8 = BatchNormalization()(x7)
-#     predictions = Conv1DTranspose(filters=1, kernel_size=ks, activation='linear', strides=2, padding='same')(x8)
-
-#     model = Model(inputs=[time_input, freq_input], outputs=predictions)
-#     return model

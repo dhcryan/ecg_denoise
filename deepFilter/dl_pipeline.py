@@ -8,26 +8,29 @@ import tensorflow as tf
 from datetime import datetime
 from deepFilter.dl_models import *
 import os
+import shap
 
 current_date = datetime.now().strftime('%m%d')
 # Custom loss SSD
+import tensorflow as tf
+
 def ssd_loss(y_true, y_pred):
-    return K.sum(K.square(y_pred - y_true), axis=-2)
+    return tf.reduce_sum(tf.square(y_pred - y_true), axis=-2)
 
 # Combined loss SSD + MSE
 def combined_ssd_mse_loss(y_true, y_pred):
-    return K.mean(K.square(y_true - y_pred), axis=-2) * 500 + K.sum(K.square(y_true - y_pred), axis=-2)
+    return tf.reduce_mean(tf.square(y_true - y_pred), axis=-2) * 500 + tf.reduce_sum(tf.square(y_true - y_pred), axis=-2)
 
 def combined_ssd_mad_loss(y_true, y_pred):
-    return K.max(K.square(y_true - y_pred), axis=-2) * 50 + K.sum(K.square(y_true - y_pred), axis=-2)
+    return tf.reduce_max(tf.square(y_true - y_pred), axis=-2) * 50 + tf.reduce_sum(tf.square(y_true - y_pred), axis=-2)
 
 # Custom loss SAD
 def sad_loss(y_true, y_pred):
-    return K.sum(K.sqrt(K.square(y_pred - y_true)), axis=-2)
+    return tf.reduce_sum(tf.sqrt(tf.square(y_pred - y_true)), axis=-2)
 
 # Custom loss MAD
 def mad_loss(y_true, y_pred):
-    return K.max(K.square(y_pred - y_true), axis=-2)
+    return tf.reduce_max(tf.square(y_pred - y_true), axis=-2)
 
 
 def train_dl(Dataset, experiment):
@@ -137,14 +140,14 @@ def train_dl(Dataset, experiment):
         # criterion = combined_huber_freq_loss
 
     model.compile(loss=criterion,
-                  optimizer=tf.keras.optimizers.Adam(lr=lr),
+                  optimizer = tf.keras.optimizers.Adam(learning_rate=lr),
                   metrics=[losses.mean_squared_error, losses.mean_absolute_error, ssd_loss, mad_loss])
 
     # Keras Callbacks
 
     # 체크포인트 파일 경로 설정
     model_dir = current_date
-    model_filepath = os.path.join(model_dir, f"{model_label}_weights.best.hdf5")
+    model_filepath = os.path.join(model_dir, f"{model_label}_weights.best.weights.h5")
 
     # 디렉토리가 존재하지 않으면 생성
     if not os.path.exists(model_dir):
@@ -187,9 +190,9 @@ def train_dl(Dataset, experiment):
     if not os.path.exists(tb_log_dir):
         os.makedirs(tb_log_dir)
     tboard = TensorBoard(log_dir=tb_log_dir, histogram_freq=0,
-                         write_graph=False, write_grads=False,
+                         write_graph=False, 
                          write_images=False, embeddings_freq=0,
-                         embeddings_layer_names=None,
+                        #  embeddings_layer_names=None,
                          embeddings_metadata=None)
 
     # To run the tensor board
@@ -315,11 +318,18 @@ def test_dl(Dataset, experiment):
         # criterion = combined_huber_freq_loss
 
     model.compile(loss=criterion,
-                  optimizer=tf.keras.optimizers.Adam(lr=0.01),
+                  optimizer=tf.keras.optimizers.Adam(learning_rate=0.01),
                   metrics=[losses.mean_squared_error, losses.mean_absolute_error, ssd_loss, mad_loss])
+    # # SHAP 분석기 정의
+    # explainer = shap.Explainer(model, [X_test, F_test_x])  # Time Domain과 Frequency Domain 둘 다 포함
+    # shap_values = explainer([X_test, F_test_x])  # SHAP 값 계산
+
+    # # SHAP 값 시각화
+    # shap.summary_plot(shap_values[0], X_test, feature_names=["Time Features"])  # Time Domain 기여도
+    # shap.summary_plot(shap_values[1], F_test_x, feature_names=["Frequency Features"])  # Frequency Domain 기여도
     # 체크포인트 파일 경로 설정
     model_dir = current_date
-    model_filepath = os.path.join(model_dir, model_label + '_weights.best.hdf5')
+    model_filepath = os.path.join(model_dir, model_label + '_weights.best.weights.h5')
 
     # 디렉토리가 존재하지 않으면 생성
     if not os.path.exists(model_dir):

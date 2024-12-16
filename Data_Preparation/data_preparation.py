@@ -92,7 +92,10 @@ def Data_Preparation(samples):
         noise_segment = noise[noise_index:noise_index + samples]
         beat_max_value = np.max(beat) - np.min(beat)
         noise_max_value = np.max(noise_segment) - np.min(noise_segment)
-        Ase = noise_max_value / beat_max_value
+        if noise_max_value == 0:
+            Ase = 1  # 기본값 설정
+        else:
+            Ase = noise_max_value / beat_max_value
         alpha = rnd_train[beat_idx] / Ase
         signal_noise = beat + alpha * noise_segment
         sn_train.append(signal_noise)
@@ -123,7 +126,10 @@ def Data_Preparation(samples):
         noise_segment = noise[noise_index:noise_index + samples]
         beat_max_value = np.max(beat) - np.min(beat)
         noise_max_value = np.max(noise_segment) - np.min(noise_segment)
-        Ase = noise_max_value / beat_max_value
+        if noise_max_value == 0:
+            Ase = 1  # 기본값 설정
+        else:
+            Ase = noise_max_value / beat_max_value
         alpha = rnd_test[beat_idx] / Ase
         signal_noise = beat + alpha * noise_segment
         sn_test.append(signal_noise)

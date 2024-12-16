@@ -317,7 +317,10 @@ def Data_Preparation_with_Fourier(samples, fs=360):
         noise_segment = noise[noise_index:noise_index + samples]
         beat_max_value = np.max(beat) - np.min(beat)
         noise_max_value = np.max(noise_segment) - np.min(noise_segment)
-        Ase = noise_max_value / beat_max_value
+        if noise_max_value == 0:
+            Ase = 1  # 기본값 설정
+        else:
+            Ase = noise_max_value / beat_max_value
         alpha = rnd_train[beat_idx] / Ase
         signal_noise = beat + alpha * noise_segment
         sn_train.append(signal_noise)
@@ -325,6 +328,7 @@ def Data_Preparation_with_Fourier(samples, fs=360):
         fourier_train_x.append(fourier_transformed_x[0])  # Append the single batch
         noise_indices_train.append(noise_combination_idx)  # 노이즈 인덱스 저장
         noise_index += samples
+        # 노이즈 크기 650000 넘어가면 초기화
         if noise_index > (len(noise) - samples):
             noise_index = 0
 
@@ -347,7 +351,10 @@ def Data_Preparation_with_Fourier(samples, fs=360):
         noise_segment = noise[noise_index:noise_index + samples]
         beat_max_value = np.max(beat) - np.min(beat)
         noise_max_value = np.max(noise_segment) - np.min(noise_segment)
-        Ase = noise_max_value / beat_max_value
+        if noise_max_value == 0:
+            Ase = 1  # 기본값 설정
+        else:
+            Ase = noise_max_value / beat_max_value
         alpha = rnd_test[beat_idx] / Ase
         signal_noise = beat + alpha * noise_segment
         sn_test.append(signal_noise)

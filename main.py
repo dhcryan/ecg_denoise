@@ -3,6 +3,10 @@ from datetime import datetime
 import time
 import numpy as np
 import os
+import scipy.io as sio
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.signal import kaiserord, firwin, filtfilt, butter
 from utils.metrics import MAD, SSD, PRD, COS_SIM, SNR
 from utils.visualization import visualize_multiple_beats, visualize_signals, plot_ecg_comparison_separate
 # from utils import visualization as vs
@@ -10,7 +14,7 @@ from Data_Preparation.data_preparation import Data_Preparation
 from Data_Preparation.data_preparation_with_fourier import Data_Preparation_with_Fourier
 from Data_Preparation.data_preparation_only_fourier import Data_Preparation_only_Fourier
 # from Data_Preparation.data_preparation_with_fourier import Data_Preparation_with_Wavelet
-from digitalFilters.dfilters import FIR_test_Dataset, IIR_test_Dataset
+from digitalFilters.dfilters import FIR_test_Dataset, IIR_test_Dataset, FIRRemoveBL, IIRRemoveBL
 from deepFilter.dl_pipeline import train_dl, test_dl
 
 if __name__ == "__main__":
@@ -23,7 +27,8 @@ if __name__ == "__main__":
     #                   'Multibranch LANL',
     #                   'Multibranch LANLD', 'AttentionSkipDAE','Transformer_DAE','Transformer_COMBDAE']
     # # dl_experiments = [, 'Transformer_COMBDAE_FreTS','Transformer_COMBDAE_updated']
-    dl_experiments = ['Transformer_COMBDAE']
+    dl_experiments = ['Transformer_DAE','Transformer_COMBDAE']
+    # dl_experiments = ['Transformer_DAE','AttentionSkipDAE']
 
     train_time_list = []
     test_time_list = []

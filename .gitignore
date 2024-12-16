@@ -21,3 +21,5 @@ tes*
 .directory
 *.txt
 .ipynb_checkpoints
+*.hdf5
+*.h5

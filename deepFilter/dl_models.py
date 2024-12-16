@@ -9,23 +9,24 @@ import tensorflow as tf
 import numpy as np
 from scipy import signal
 
-def Conv1DTranspose(input_tensor, filters, kernel_size, strides=2, activation='relu', padding='same'):
-    """
-        https://stackoverflow.com/a/45788699
+from tensorflow.keras.layers import Layer
 
-        input_tensor: tensor, with the shape (batch_size, time_steps, dims)
-        filters: int, output dimension, i.e. the output tensor will have the shape of (batch_size, time_steps, filters)
-        kernel_size: int, size of the convolution kernel
-        strides: int, convolution step size
-        padding: 'same' | 'valid'
-    """
-    x = Lambda(lambda x: K.expand_dims(x, axis=2))(input_tensor)
+class ExpandDimsLayer(Layer):
+    def __init__(self, axis, **kwargs):
+        super(ExpandDimsLayer, self).__init__(**kwargs)
+        self.axis = axis
+
+    def call(self, inputs):
+        return tf.expand_dims(inputs, axis=self.axis)
+
+def Conv1DTranspose(input_tensor, filters, kernel_size, strides=2, activation='relu', padding='same'):
+    x = ExpandDimsLayer(axis=2)(input_tensor)
     x = Conv2DTranspose(filters=filters,
                         kernel_size=(kernel_size, 1),
                         activation=activation,
                         strides=(strides, 1),
                         padding=padding)(x)
-    x = Lambda(lambda x: K.squeeze(x, axis=2))(x)
+    x = Lambda(lambda x: tf.squeeze(x, axis=2))(x)
     return x
 
 ##########################################################################
@@ -601,7 +602,7 @@ class CBAM(tf.keras.layers.Layer):
 
 class AttentionBlock(tf.keras.layers.Layer):
     def __init__(self, signal_size, channels, kernel_size=16,
-                 input_size=None, activation='LeakyReLU'):
+                 input_size=None, activation=None):
         super(AttentionBlock, self).__init__()
         if input_size is not None:
             self.conv = Conv1D(
@@ -609,15 +610,16 @@ class AttentionBlock(tf.keras.layers.Layer):
                 kernel_size,
                 input_shape=input_size,
                 padding='same',
-                activation=activation
+                activation=None  # Activation은 이후에 명시적으로 적용
             )
         else:
             self.conv = Conv1D(
                 channels,
                 kernel_size,
                 padding='same',
-                activation=activation
+                activation=None  # Activation은 이후에 명시적으로 적용
             )
+        self.activation = tf.keras.layers.LeakyReLU() if activation == 'LeakyReLU' else None
         self.attention = CBAM(
             1,
             3,
@@ -635,9 +637,12 @@ class AttentionBlock(tf.keras.layers.Layer):
 
     def call(self, x):
         output = self.conv(x)
+        if self.activation is not None:
+            output = self.activation(output)
         output = self.attention(output)
         output = self.maxpool(output)
         return output
+
 
 class AttentionBlockBN(tf.keras.layers.Layer):
     def __init__(self, signal_size, channels, kernel_size=16,
@@ -649,18 +654,18 @@ class AttentionBlockBN(tf.keras.layers.Layer):
                 kernel_size,
                 input_shape=input_size,
                 padding='same',
-                activation=None
+                activation=None  # Activation은 별도로 정의
             )
         else:
             self.conv = Conv1D(
                 channels,
                 kernel_size,
                 padding='same',
-                activation=None
+                activation=None  # Activation은 별도로 정의
             )
         self.activation = tf.keras.layers.LeakyReLU()
         self.bn = BatchNormalization()
-        self.dp = Dropout(rate=0.001) #rate=0.1 for qtdb
+        self.dp = Dropout(rate=0.001)  # rate=0.1 for qtdb
         self.attention = CBAM(
             1,
             3,
@@ -686,7 +691,7 @@ class AttentionBlockBN(tf.keras.layers.Layer):
 
 class EncoderBlock(tf.keras.layers.Layer):
     def __init__(self, signal_size, channels, kernel_size=16,
-                 input_size=None, activation='LeakyReLU'):
+                 input_size=None, activation=None):
         super(EncoderBlock, self).__init__()
         if input_size is not None:
             self.conv = Conv1D(
@@ -694,15 +699,16 @@ class EncoderBlock(tf.keras.layers.Layer):
                 kernel_size,
                 input_shape=input_size,
                 padding='same',
-                activation=activation
+                activation=None  # Activation은 이후에 명시적으로 적용
             )
         else:
             self.conv = Conv1D(
                 channels,
                 kernel_size,
                 padding='same',
-                activation=activation
+                activation=None  # Activation은 이후에 명시적으로 적용
             )
+        self.activation = tf.keras.layers.LeakyReLU() if activation == 'LeakyReLU' else None
         self.maxpool = MaxPool1D(
             padding='same',
             strides=2
@@ -710,12 +716,15 @@ class EncoderBlock(tf.keras.layers.Layer):
 
     def call(self, x):
         output = self.conv(x)
+        if self.activation is not None:
+            output = self.activation(output)
         output = self.maxpool(output)
         return output
 
+
 class AttentionDeconv(tf.keras.layers.Layer):
     def __init__(self, signal_size, channels, kernel_size=16,
-                 input_size=None, activation='LeakyReLU',
+                 input_size=None, activation=None,
                  strides=2, padding='same'):
         super(AttentionDeconv, self).__init__()
         self.deconv = keras.layers.Conv1DTranspose(
@@ -723,8 +732,9 @@ class AttentionDeconv(tf.keras.layers.Layer):
             kernel_size,
             strides=strides,
             padding=padding,
-            activation=activation
+            activation=None  # Activation은 이후에 명시적으로 적용
         )
+        self.activation = tf.keras.layers.LeakyReLU() if activation == 'LeakyReLU' else None
         self.attention = CBAM(
             1,
             3,
@@ -737,12 +747,16 @@ class AttentionDeconv(tf.keras.layers.Layer):
         )
 
     def call(self, x):
-        output = self.attention(self.deconv(x))
+        output = self.deconv(x)
+        if self.activation is not None:
+            output = self.activation(output)
+        output = self.attention(output)
         return output
+
 
 class AttentionDeconvBN(tf.keras.layers.Layer):
     def __init__(self, signal_size, channels, kernel_size=16,
-                 input_size=None, activation='LeakyReLU',
+                 input_size=None, activation=None,
                  strides=2, padding='same'):
         super(AttentionDeconvBN, self).__init__()
         self.deconv = keras.layers.Conv1DTranspose(
@@ -752,11 +766,8 @@ class AttentionDeconvBN(tf.keras.layers.Layer):
             padding=padding,
         )
         self.bn = BatchNormalization()
-        if activation == 'LeakyReLU':
-            self.activation = tf.keras.layers.LeakyReLU()
-        else:
-            self.activation = None
-        self.dp = Dropout(rate=0.001) #rate=0.1 for qtdb
+        self.activation = tf.keras.layers.LeakyReLU() if activation == 'LeakyReLU' else None
+        self.dp = Dropout(rate=0.001)  # rate=0.1 for qtdb
         self.attention = CBAM(
             1,
             3,
@@ -776,6 +787,7 @@ class AttentionDeconvBN(tf.keras.layers.Layer):
         output = self.dp(output)
         output = self.attention(output)
         return output
+
 
 class AttentionDeconvECA(tf.keras.layers.Layer):
     def __init__(self, signal_size, channels, kernel_size=16,
@@ -857,8 +869,14 @@ class AddGatedNoise(layers.Layer):
         super(AddGatedNoise, self).__init__(**kwargs)
 
     def call(self, x, training=None):
+        # training 매개변수를 직접 사용
+        if training is None:
+            training = False
+        
         noise = tf.random.uniform(shape=tf.shape(x), minval=-1, maxval=1)
-        return tf.keras.backend.in_train_phase(x * (1 + noise), x, training=training)
+        return tf.cond(tf.cast(training, tf.bool), 
+                       lambda: x * (1 + noise), 
+                       lambda: x)
 def get_emb(sin_inp):
     """
     Gets a base embedding for one dimension with sin and cos intertwined
@@ -1075,7 +1093,7 @@ def Transformer_COMBDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,
                 strides=2,
                 padding='same')(time_input)
 
-    x0 = AddGatedNoise()(x0)
+    # x0 = AddGatedNoise()(x0)
 
     x0 = layers.Activation('sigmoid')(x0)
     # x0 = Dropout(0.3)(x0)
@@ -1096,7 +1114,7 @@ def Transformer_COMBDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,
                 strides=2,
                 padding='same')(xmul0)
 
-    x1 = AddGatedNoise()(x1)
+    # x1 = AddGatedNoise()(x1)
     x1 = layers.Activation('sigmoid')(x1)
 
     # x1 = Dropout(0.3)(x1)
@@ -1114,7 +1132,7 @@ def Transformer_COMBDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,
                activation='linear',
                strides=2,
                padding='same')(xmul1)
-    x2 = AddGatedNoise()(x2)
+    # x2 = AddGatedNoise()(x2)
     x2 = layers.Activation('sigmoid')(x2)
     # x2 = Dropout(0.3)(x2)
     x2_ = Conv1D(filters=64,

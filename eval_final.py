@@ -164,16 +164,8 @@ if __name__ == "__main__":
     metric_values = [SSD_all, MAD_all, PRD_all, CORR_all, SNR_all]
     # Metrics table
     generate_table(metrics, metric_values, Exp_names)
-
-
-    
-    # timing_var = ['training', 'test']
-    # generate_table_time(timing_var, timing, Exp_names, gpu=True)
     
     rnd_test = np.load('rnd_test.npy')
-    # print(rnd_test.shape)
-    # 13316,
-    # rnd_test = np.concatenate([rnd_test, rnd_test])
 
     segm = [0.2, 0.6, 1.0, 1.5, 2.0]  # real number of segmentations is len(segmentations) - 1
     SSD_seg_all = []

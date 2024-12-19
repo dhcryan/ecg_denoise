@@ -39,14 +39,9 @@ def train_dl(Dataset, experiment):
     
     if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_COMBDAE_updated']:
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
-        # F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
-            # 시간 도메인과 주파수 도메인 데이터를 함께 분할
+
         X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.3, shuffle=True, random_state=1)
         F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
-    # elif experiment == 'Transformer_FreqDAE':
-    #     [X_train, y_train, X_test, y_test] = Dataset
-    #     # 일반 모델들을 위한 데이터 분할
-    #     X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.3, shuffle=True, random_state=1)
     else:
         [X_train, y_train, X_test, y_test] = Dataset
         # 일반 모델들을 위한 데이터 분할
@@ -64,21 +59,6 @@ def train_dl(Dataset, experiment):
         # DRNN
         model = DRRN_denoising()
         model_label = 'DRNN'
-
-    if experiment == 'Vanilla L':
-        # Vanilla CNN linear
-        model = deep_filter_vanilla_linear()
-        model_label = 'Vanilla_L'
-
-    if experiment == 'Vanilla NL':
-        # Vanilla CNN non linear
-        model = deep_filter_vanilla_Nlinear()
-        model_label = 'Vanilla_NL'
-
-    if experiment == 'Multibranch LANL':
-        # Multibranch linear and non linear
-        model = deep_filter_I_LANL()
-        model_label = 'Multibranch_LANL'
 
     if experiment == 'Multibranch LANLD':
         # Inception-like linear and non linear dilated
@@ -99,30 +79,11 @@ def train_dl(Dataset, experiment):
         model = Transformer_COMBDAE()
         model_label = 'Transformer_COMBDAE'
         
-    if experiment == 'Transformer_COMBDAE_FreTS':
-        model = Transformer_COMBDAE_FreTS()
-        model_label = 'Transformer_COMBDAE_FreTS'
-
-    if experiment == 'Transformer_COMBDAE_updated':
-        model = Transformer_COMBDAE_updated()
-        model_label = 'Transformer_COMBDAE_updated'
-        
-    if experiment == 'Transformer_FreqDAE':
-        model = Transformer_FreqDAE()
-        model_label = 'Transformer_FreqDAE'
     print('\n ' + model_label + '\n ')
 
     model.summary()
-
-    # epochs = int(1e3)  # 100000
-    # # epochs = 100
-    # batch_size = 128
-    # lr = 1e-3
-    # minimum_lr = 1e-7
     epochs = int(1e5)  # 100000
-    # epochs = 40
-    # epochs = 100
-    batch_size = 64  #128
+    batch_size = 128  #128
     # batch_size = 64
     lr = 1e-3
     # lr = 1e-4
@@ -137,7 +98,6 @@ def train_dl(Dataset, experiment):
 
     else:
         criterion = combined_ssd_mad_loss
-        # criterion = combined_huber_freq_loss
 
     model.compile(loss=criterion,
                   optimizer = tf.keras.optimizers.Adam(learning_rate=lr),
@@ -171,19 +131,6 @@ def train_dl(Dataset, experiment):
                             mode='min',             # val_loss 최소화를 목표로 함
                             patience=30,            # patience를 50에서 20으로 줄여 더 빠른 조기 종료
                             verbose=1)
-    # reduce_lr = ReduceLROnPlateau(monitor="val_loss",
-    #                               factor=0.5,
-    #                               min_delta=0.05,
-    #                               mode='min',  # on acc has to go max
-    #                               patience=2,
-    #                               min_lr=minimum_lr,
-    #                               verbose=1)
-
-    # early_stop = EarlyStopping(monitor="val_loss",  # "val_loss"
-    #                            min_delta=0.01,
-    #                            mode='min',  # on acc has to go max
-    #                            patience=30,
-    #                            verbose=1)
     
     tb_log_dir = './runs_' + current_date +'/' + model_label
     # 디렉토리가 존재하지 않으면 생성
@@ -198,8 +145,6 @@ def train_dl(Dataset, experiment):
     # To run the tensor board
     # tensorboard --logdir=./runs_new
 
-    # GPU
-    # if experiment == 'Transformer_COMBDAE_FreTS':
     if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_COMBDAE_updated']:
         model.fit(x=[X_train, F_train_x], y=y_train,
                 validation_data=([X_val, F_val_x], y_val),
@@ -228,22 +173,13 @@ def test_dl(Dataset, experiment):
 
     print('Deep Learning pipeline: Testing the model')
 # 여기선 x_test, y_test만 사용됨
-    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_COMBDAE_updated']:
+    if experiment in ['Transformer_COMBDAE']:
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
 
-        # F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
-            # 시간 도메인과 주파수 도메인 데이터를 함께 분할
-        # X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.3, shuffle=True, random_state=1)
-        # F_train_x, F_val_x, F_train_y, F_val_y = train_test_split(F_train_x, F_train_y, test_size=0.3, shuffle=True, random_state=1)
-    # elif experiment == 'Transformer_FreqDAE':
-    #     [X_train, y_train, X_test, y_test] = Dataset
-        # 일반 모델들을 위한 데이터 분할
     else:
         [X_train, y_train, X_test, y_test] = Dataset
         # 일반 모델들을 위한 데이터 분할
-        # X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.3, shuffle=True, random_state=1)
-      
-    batch_size = 64
+    batch_size = 128
 
     # ==================
     # LOAD THE DL MODEL
@@ -257,21 +193,6 @@ def test_dl(Dataset, experiment):
         # DRNN
         model = DRRN_denoising()
         model_label = 'DRNN'
-
-    if experiment == 'Vanilla L':
-        # Vanilla CNN linear
-        model = deep_filter_vanilla_linear()
-        model_label = 'Vanilla_L'
-
-    if experiment == 'Vanilla NL':
-        # Vanilla CNN non linear
-        model = deep_filter_vanilla_Nlinear()
-        model_label = 'Vanilla_NL'
-
-    if experiment == 'Multibranch LANL':
-        # Multibranch linear and non linear
-        model = deep_filter_I_LANL()
-        model_label = 'Multibranch_LANL'
 
     if experiment == 'Multibranch LANLD':
         # Inception-like linear and non linear dilated
@@ -290,18 +211,7 @@ def test_dl(Dataset, experiment):
     if experiment == 'Transformer_COMBDAE':
         model = Transformer_COMBDAE()
         model_label = 'Transformer_COMBDAE'
-                
-    if experiment == 'Transformer_COMBDAE_FreTS':
-        model = Transformer_COMBDAE_FreTS()
-        model_label = 'Transformer_COMBDAE_FreTS'
-                
-    if experiment == 'Transformer_COMBDAE_updated':
-        model = Transformer_COMBDAE_updated()
-        model_label = 'Transformer_COMBDAE_updated'
-        
-    if experiment == 'Transformer_FreqDAE':
-        model = Transformer_FreqDAE()
-        model_label = 'Transformer_FreqDAE'
+            
     print('\n ' + model_label + '\n ')
 
     model.summary()

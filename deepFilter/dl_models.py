@@ -10,7 +10,7 @@ import numpy as np
 from scipy import signal
 
 from tensorflow.keras.layers import Layer
-
+from tensorflow.keras.layers import Conv1D, BatchNormalization, Multiply, Add, Activation
 class ExpandDimsLayer(Layer):
     def __init__(self, axis, **kwargs):
         super(ExpandDimsLayer, self).__init__(**kwargs)

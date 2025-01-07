@@ -24,3 +24,5 @@ tes*
 *.hdf5
 *.h5
 *.tex
+*.json
+/cinc2017/*

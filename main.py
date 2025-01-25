@@ -19,7 +19,7 @@ if __name__ == "__main__":
     dl_experiments = [
                       'DRNN',
                       'FCN-DAE',
-                      'Multibranch LANLD', 'AttentionSkipDAE','Transformer_DAE','Transformer_COMBDAE']
+                      'DeepFilter', 'AttentionSkipDAE','Transformer_DAE','Transformer_COMBDAE']
 
     train_time_list = []
     test_time_list = []

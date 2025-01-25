@@ -60,10 +60,10 @@ def train_dl(Dataset, experiment):
         model = DRRN_denoising()
         model_label = 'DRNN'
 
-    if experiment == 'Multibranch LANLD':
+    if experiment == 'DeepFilter':
         # Inception-like linear and non linear dilated
         model = deep_filter_model_I_LANL_dilated()
-        model_label = 'Multibranch_LANLD'
+        model_label = 'DeepFilter'
         
     if experiment == 'AttentionSkipDAE':
         # Inception-like linear and non linear dilated
@@ -194,10 +194,10 @@ def test_dl(Dataset, experiment):
         model = DRRN_denoising()
         model_label = 'DRNN'
 
-    if experiment == 'Multibranch LANLD':
+    if experiment == 'DeepFilter':
         # Inception-like linear and non linear dilated
         model = deep_filter_model_I_LANL_dilated()
-        model_label = 'Multibranch_LANLD'
+        model_label = 'DeepFilter'
 
     if experiment == 'AttentionSkipDAE':
         # Inception-like linear and non linear dilated

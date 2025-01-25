@@ -18,7 +18,7 @@ from deepFilter.dl_pipeline import train_dl, test_dl
 if __name__ == "__main__":
     # Get the current date in 'MMDD' format
     current_date = datetime.now().strftime('%m%d')
-    dl_experiments = ['DRNN','FCN-DAE', 'Multibranch LANLD','AttentionSkipDAE','Transformer_DAE','Transformer_COMBDAE']
+    dl_experiments = ['DRNN','FCN-DAE', 'DeepFilter','AttentionSkipDAE','Transformer_DAE','Transformer_COMBDAE']
 
     ####### LOAD EXPERIMENTS #######
 
@@ -30,7 +30,7 @@ if __name__ == "__main__":
         test_FCN_DAE = pickle.load(input)
     # Load Results Multibranch LANLD
     with open('1208/test_results_'  + dl_experiments[2] + '.pkl', 'rb') as input:
-        test_Multibranch_LANLD = pickle.load(input)
+        test_DeepFilter = pickle.load(input)
     # Load Results AttentionSkipDAE
     with open('1208/test_results_'  + dl_experiments[3] + '.pkl', 'rb') as input:
         test_AttentionSkipDAE = pickle.load(input)
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     SNR_values_DL_FCN_DAE = SNR(y_test, y_pred)
 
     # Multibranch_LANLD
-    [X_test, y_test, y_pred] = test_Multibranch_LANLD
+    [X_test, y_test, y_pred] = test_DeepFilter
     SSD_values_DL_exp_1 = SSD(y_test, y_pred)
     MAD_values_DL_exp_1 = MAD(y_test, y_pred)
     PRD_values_DL_exp_1 = PRD(y_test, y_pred)

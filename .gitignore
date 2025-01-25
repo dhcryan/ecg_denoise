@@ -7,7 +7,7 @@ deepFilter/__pycache__/*
 digitalFilter/__pycache__/*
 utils/__pycache__/*
 /data/*
-
+/exp/*
 # Files to ignore
 *.pyc
 *.png

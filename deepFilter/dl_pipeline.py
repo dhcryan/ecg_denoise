@@ -84,7 +84,7 @@ def train_dl(Dataset, experiment):
     model.summary()
     epochs = int(1e5)  # 100000
     batch_size = 128  #128
-    # batch_size = 64
+
     lr = 1e-3
     # lr = 1e-4
     minimum_lr = 1e-10
@@ -131,7 +131,11 @@ def train_dl(Dataset, experiment):
                             mode='min',             # val_loss 최소화를 목표로 함
                             patience=30,            # patience를 50에서 20으로 줄여 더 빠른 조기 종료
                             verbose=1)
-    
+    # early_stop = EarlyStopping(monitor="val_loss",  
+    #                         min_delta=0.001,       # 개선 판단을 위한 최소 변화량
+    #                         mode='min',             # val_loss 최소화를 목표로 함
+    #                         patience=50,            # patience를 50에서 20으로 줄여 더 빠른 조기 종료
+    #                         verbose=1)
     tb_log_dir = './runs_' + current_date +'/' + model_label
     # 디렉토리가 존재하지 않으면 생성
     if not os.path.exists(tb_log_dir):

@@ -19,9 +19,11 @@ def Data_Preparation(samples):
 
     print(f"[INFO] Loaded QTDatabase with {len(qtdb.keys())} signals")
 
-    # Load combined noise
+    # # Load combined noise
     with open('data/CombinedNoise.pkl', 'rb') as input:
         combined_noise = pickle.load(input)
+    # with open('data/StaticNoise.pkl', 'rb') as input:
+    #     combined_noise = pickle.load(input)
     print(f"[INFO] Loaded CombinedNoise with {len(combined_noise)} channels")
 
     #####################################

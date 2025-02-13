@@ -149,7 +149,7 @@ def train_dl(Dataset, experiment):
     # To run the tensor board
     # tensorboard --logdir=./runs_new
 
-    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_COMBDAE_updated']:
+    if experiment in ['Transformer_COMBDAE']:
         model.fit(x=[X_train, F_train_x], y=y_train,
                 validation_data=([X_val, F_val_x], y_val),
                 batch_size=batch_size,

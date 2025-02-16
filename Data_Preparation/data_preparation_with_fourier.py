@@ -83,10 +83,10 @@ def Data_Preparation_with_Fourier(samples, fs=360):
 
     print(f"[INFO] Loaded QTDatabase with {len(qtdb.keys())} signals")
     # Load combined noise
-    with open('data/CombinedNoise.pkl', 'rb') as input:
-        combined_noise = pickle.load(input)
-    # with open('data/StaticNoise.pkl', 'rb') as input:
+    # with open('data/CombinedNoise.pkl', 'rb') as input:
     #     combined_noise = pickle.load(input)
+    with open('data/StaticNoise.pkl', 'rb') as input:
+        combined_noise = pickle.load(input)
     print(f"[INFO] Loaded CombinedNoise with {len(combined_noise)} channels")
 
     #####################################
@@ -124,15 +124,11 @@ def Data_Preparation_with_Fourier(samples, fs=360):
             if b_sq.shape[0] > (samples - init_padding):
                 skip_beats += 1
                 continue
-
             b_np[init_padding:b_sq.shape[0] + init_padding] = b_sq - (b_sq[0] + b_sq[-1]) / 2
-
             # Fourier 변환 적용 (주파수 도메인 정보, time-domain과 동일한 shape으로)
             fourier_transformed_y = make_fourier(b_np.reshape(1, -1), samples, fs)
             # # ablation study를 위해 IFFT 적용 (model D)
             # fourier_transformed_y = make_fourier_ifft(b_np.reshape(1, -1), samples, fs)
-
-
             if signal_name in test_set:
                 beats_test.append(b_np)
                 fourier_test_y.append(fourier_transformed_y[0])  # Append the single batch
@@ -162,17 +158,18 @@ def Data_Preparation_with_Fourier(samples, fs=360):
 
         # 노이즈 조합도 순차적으로 선택, 주기적으로 변화를 줌 (매 8회 주기)
         # noise_combination_idx = (beat_idx % 7) + 1  # 1부터 7까지 순차적으로 선택
-        noise_combination_idx = 0  # 1부터 7까지 순차적으로 선택        
+        noise_combination_idx = 0         
         noise = combined_noise[selected_channel][:, noise_combination_idx]
         noise_segment = noise[noise_index:noise_index + samples]
         beat_max_value = np.max(beat) - np.min(beat)
         noise_max_value = np.max(noise_segment) - np.min(noise_segment)
-        if noise_max_value == 0:
-            Ase = 1  # 기본값 설정
-        else:
-            Ase = noise_max_value / beat_max_value
-        alpha = rnd_train[beat_idx] / Ase
-        signal_noise = beat + alpha * noise_segment
+        # if noise_max_value == 0:
+        #     Ase = 1  # 기본값 설정
+        # else:
+        #     Ase = noise_max_value / beat_max_value
+        # alpha = rnd_train[beat_idx] / Ase
+        # signal_noise = beat + alpha * noise_segment
+        signal_noise = beat + noise_segment
         sn_train.append(signal_noise)
         fourier_transformed_x = make_fourier(signal_noise.reshape(1, -1), samples, fs)  # X에 대한 Fourier 변환
         fourier_train_x.append(fourier_transformed_x[0])  # Append the single batch
@@ -190,7 +187,7 @@ def Data_Preparation_with_Fourier(samples, fs=360):
         
     for beat_idx, beat in enumerate(beats_test):
         # if np.random.rand() < channel_ratio:
-        if (beat_idx // 10) % 2 == 0:
+        if (beat_idx // 10) % 2 == 1:
             selected_channel = beat_idx % 2  # 0과 1을 번갈아 선택
         else:
             selected_channel = (beat_idx + 1) % 2  # 반대 순서로 선택
@@ -201,12 +198,13 @@ def Data_Preparation_with_Fourier(samples, fs=360):
         noise_segment = noise[noise_index:noise_index + samples]
         beat_max_value = np.max(beat) - np.min(beat)
         noise_max_value = np.max(noise_segment) - np.min(noise_segment)
-        if noise_max_value == 0:
-            Ase = 1  # 기본값 설정
-        else:
-            Ase = noise_max_value / beat_max_value
-        alpha = rnd_test[beat_idx] / Ase
-        signal_noise = beat + alpha * noise_segment
+        # if noise_max_value == 0:
+        #     Ase = 1  # 기본값 설정
+        # else:
+        #     Ase = noise_max_value / beat_max_value
+        # alpha = rnd_train[beat_idx] / Ase
+        # signal_noise = beat + alpha * noise_segment
+        signal_noise = beat + noise_segment
         sn_test.append(signal_noise)
         fourier_transformed_x = make_fourier(signal_noise.reshape(1, -1), samples, fs)  # X에 대한 Fourier 변환
         fourier_test_x.append(fourier_transformed_x[0])  # Append the single batch

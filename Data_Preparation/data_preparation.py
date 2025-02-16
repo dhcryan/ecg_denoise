@@ -94,12 +94,13 @@ def Data_Preparation(samples):
         noise_segment = noise[noise_index:noise_index + samples]
         beat_max_value = np.max(beat) - np.min(beat)
         noise_max_value = np.max(noise_segment) - np.min(noise_segment)
-        if noise_max_value == 0:
-            Ase = 1  # 기본값 설정
-        else:
-            Ase = noise_max_value / beat_max_value
-        alpha = rnd_train[beat_idx] / Ase
-        signal_noise = beat + alpha * noise_segment
+        # if noise_max_value == 0:
+        #     Ase = 1  # 기본값 설정
+        # else:
+        #     Ase = noise_max_value / beat_max_value
+        # alpha = rnd_train[beat_idx] / Ase
+        signal_noise = beat + noise_segment
+        # signal_noise = beat + alpha * noise_segment
         sn_train.append(signal_noise)
         noise_indices_train.append(noise_combination_idx)  # 노이즈 인덱스 저장
         noise_index += samples
@@ -116,7 +117,7 @@ def Data_Preparation(samples):
     
     for beat_idx, beat in enumerate(beats_test):
         # if np.random.rand() < channel_ratio:
-        if (beat_idx // 10) % 2 == 0:
+        if (beat_idx // 10) % 2 == 1:
             selected_channel = beat_idx % 2  # 0과 1을 번갈아 선택
         else:
             selected_channel = (beat_idx + 1) % 2  # 반대 순서로 선택
@@ -128,12 +129,13 @@ def Data_Preparation(samples):
         noise_segment = noise[noise_index:noise_index + samples]
         beat_max_value = np.max(beat) - np.min(beat)
         noise_max_value = np.max(noise_segment) - np.min(noise_segment)
-        if noise_max_value == 0:
-            Ase = 1  # 기본값 설정
-        else:
-            Ase = noise_max_value / beat_max_value
-        alpha = rnd_test[beat_idx] / Ase
-        signal_noise = beat + alpha * noise_segment
+        # if noise_max_value == 0:
+        #     Ase = 1  # 기본값 설정
+        # else:
+        #     Ase = noise_max_value / beat_max_value
+        # alpha = rnd_test[beat_idx] / Ase
+        # signal_noise = beat + alpha * noise_segment
+        signal_noise = beat + noise_segment
         sn_test.append(signal_noise)
         noise_indices_test.append(noise_combination_idx)  # 노이즈 인덱스 저장
         noise_index += samples

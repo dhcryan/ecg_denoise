@@ -885,7 +885,7 @@ def frequency_branch(input_tensor, filters, kernel_size=13):
     return xmul2
 
 
-def Transformer_COMBDAE(signal_size = sigLen,head_size=64,num_heads=16,ff_dim=64,num_transformer_blocks=4, dropout=0):   ###paper 1 model
+def Transformer_COMBDAE(signal_size = sigLen,head_size=64,num_heads=4,ff_dim=64,num_transformer_blocks=4, dropout=0):   ###paper 1 model
     input_shape = (signal_size, 1)
     time_input = Input(shape=input_shape)
     
@@ -998,3 +998,277 @@ def Transformer_COMBDAE(signal_size = sigLen,head_size=64,num_heads=16,ff_dim=64
 
     model = Model(inputs=[time_input, freq_input], outputs=predictions)
     return model
+
+
+# import tensorflow as tf
+# from tensorflow.keras.layers import Input, Conv1D, Activation, Multiply, BatchNormalization, Concatenate,  Add, Dense, Dropout, LayerNormalization
+# from tensorflow.keras.models import Model
+
+
+
+# import tensorflow as tf
+# from tensorflow.keras.layers import Layer
+
+# class AutoCorrelationAttentionLayer(Layer):
+#     def call(self, x):
+#         # x: (batch, seq_len, d_model)
+#         # tf.zeros_like(x)와 tf.complex는 call 내부에서 사용되므로 KerasTensor 문제가 발생하지 않습니다.
+#         x_complex = tf.complex(x, tf.zeros_like(x))
+#         fft_x = tf.signal.fft(x_complex)
+#         # auto-correlation = inverse FFT(FFT(x) * conj(FFT(x)))
+#         ac = tf.signal.ifft(fft_x * tf.math.conj(fft_x))
+#         ac = tf.math.real(ac)
+#         return ac
+
+
+# def autoformer_attention(x):
+#     ac = AutoCorrelationAttentionLayer()(x)
+#     weights = tf.keras.layers.Lambda(lambda t: tf.nn.softmax(t, axis=1))(ac)
+#     out = weights * x
+#     return out
+
+
+
+# class SeriesDecompLayer(Layer):
+#     def __init__(self, kernel_size, **kwargs):
+#         super(SeriesDecompLayer, self).__init__(**kwargs)
+#         self.kernel_size = kernel_size
+#         self.padding = (kernel_size - 1) // 2
+#         # AveragePooling1D는 커널 크기와 stride=1, valid padding으로 설정
+#         self.pool = tf.keras.layers.AveragePooling1D(pool_size=kernel_size, strides=1, padding='valid')
+
+#     def call(self, x):
+#         # tf.pad를 레이어 내부에서 사용
+#         x_padded = tf.pad(x, [[0, 0], [self.padding, self.padding], [0, 0]], mode='REFLECT')
+#         moving_mean = self.pool(x_padded)
+#         # 추세(trend)와 잔차(residual) 계산
+#         trend = moving_mean
+#         residual = x - moving_mean
+#         return residual, trend
+
+#     def compute_output_shape(self, input_shape):
+#         # 두 개의 텐서를 반환하므로 튜플로 반환 (각각의 output shape)
+#         batch_size, seq_len, channels = input_shape
+#         # AveragePooling1D의 결과는 seq_len 그대로 유지 (padding='valid'와 직접 pad했으므로)
+#         output_shape = (batch_size, seq_len, channels)
+#         return output_shape, output_shape
+
+# # Autoformer 스타일 블록
+# def AutoformerBlock(x, kernel_size=25, dropout=0.0):
+#     # 기존 series_decomp 대신 사용자 정의 레이어 사용
+#     residual, trend = SeriesDecompLayer(kernel_size)(x)
+    
+#     # Auto-correlation 기반 attention 적용 (이 부분은 기존 코드 유지)
+#     attn_out = autoformer_attention(residual)
+#     attn_out = tf.keras.layers.Dropout(dropout)(attn_out)
+    
+#     # Residual 연결 및 Layer Normalization
+#     x = tf.keras.layers.Add()([x, attn_out])
+#     x = tf.keras.layers.LayerNormalization()(x)
+    
+#     # Feed-Forward 네트워크
+#     ff = tf.keras.layers.Dense(x.shape[-1], activation='relu')(x)
+#     ff = tf.keras.layers.Dropout(dropout)(ff)
+#     ff = tf.keras.layers.Dense(x.shape[-1])(ff)
+#     x = tf.keras.layers.Add()([x, ff])
+#     x = tf.keras.layers.LayerNormalization()(x)
+    
+#     return x
+
+
+# # 원래의 COMBDAE 구조에서 AutoformerBlock을 적용한 모델 (Encoder/Decoder 구조는 기존과 동일)
+# def Transformer_COMBDAE(signal_size=sigLen, 
+#                       patch_size=4,         # 패치 길이 (하이퍼파라미터)
+#                       embed_dim=128,        # 패치 임베딩 차원
+#                       head_size=64, num_heads=16, ff_dim=64, 
+#                       num_transformer_blocks=4, dropout=0):
+#     # 입력 정의 (시간 도메인, 주파수 도메인)
+#     input_shape = (signal_size, 1)
+#     time_input = Input(shape=input_shape)
+#     freq_input = Input(shape=input_shape)
+    
+#     # --- 인코더: 시간 도메인 처리 (기존 Conv1D 기반) ---
+#     x0 = Conv1D(filters=16, kernel_size=ks, activation='linear', strides=2, padding='same')(time_input)
+#     x0 = Activation('sigmoid')(x0)
+#     x0_ = Conv1D(filters=16, kernel_size=ks, activation=None, strides=2, padding='same')(time_input)
+#     xmul0 = Multiply()([x0, x0_])
+#     xmul0 = BatchNormalization()(xmul0)
+    
+#     x1 = Conv1D(filters=32, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul0)
+#     x1 = Activation('sigmoid')(x1)
+#     x1_ = Conv1D(filters=32, kernel_size=ks, activation=None, strides=2, padding='same')(xmul0)
+#     xmul1 = Multiply()([x1, x1_])
+#     xmul1 = BatchNormalization()(xmul1)
+    
+#     x2 = Conv1D(filters=64, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul1)
+#     x2 = Activation('sigmoid')(x2)
+#     x2_ = Conv1D(filters=64, kernel_size=ks, activation='elu', strides=2, padding='same')(xmul1)
+#     xmul2 = Multiply()([x2, x2_])
+#     xmul2 = BatchNormalization()(xmul2)
+    
+#     # --- 주파수 도메인 분기: 기존 frequency_branch 사용 (별도 구현되어 있다고 가정) ---
+#     f2 = frequency_branch(freq_input, 16, 13)
+    
+#     # --- 시간 및 주파수 도메인 특징 결합 + 위치 임베딩 (TFPositionalEncoding1D는 별도 구현) ---
+#     combined = Concatenate()([xmul2, f2])
+#     position_embed = TFPositionalEncoding1D(signal_size)
+#     x3 = combined + position_embed(combined)
+    
+#     # --- Autoformer Block 여러 개 적용 ---
+#     x = x3
+#     for _ in range(num_transformer_blocks):
+#         x = AutoformerBlock(x, kernel_size=25, dropout=dropout)
+    
+#     # --- 디코더: Conv1DTranspose 기반 복원 ---
+#     x4 = x
+#     x5 = Conv1DTranspose(input_tensor=x4, filters=64, kernel_size=ks, activation='elu', strides=1, padding='same')
+#     x5 = Add()([x5, xmul2])
+#     x5 = BatchNormalization()(x5)
+    
+#     x6 = Conv1DTranspose(input_tensor=x5, filters=32, kernel_size=ks, activation='elu', strides=2, padding='same')
+#     x6 = Add()([x6, xmul1])
+#     x6 = BatchNormalization()(x6)
+    
+#     x7 = Conv1DTranspose(input_tensor=x6, filters=16, kernel_size=ks, activation='elu', strides=2, padding='same')
+#     x7 = Add()([x7, xmul0])
+#     x8 = BatchNormalization()(x7)
+    
+#     predictions = Conv1DTranspose(input_tensor=x8, filters=1, kernel_size=ks, activation='linear', strides=2, padding='same')
+    
+#     model = Model(inputs=[time_input, freq_input], outputs=predictions)
+#     return model
+# import tensorflow as tf
+# from tensorflow.keras.layers import Input, Conv1D, Activation, Multiply, BatchNormalization, Concatenate,  Add, Dense, Dropout, LayerNormalization
+# from tensorflow.keras.models import Model
+
+# import tensorflow as tf
+# from tensorflow.keras.layers import Layer, Input, Conv1D, Activation, Multiply, BatchNormalization, Concatenate,  Add, Dense, Dropout, LayerNormalization
+# from tensorflow.keras.models import Model
+
+# # Series Decomposition Layer (기존 코드와 동일)
+# class SeriesDecompLayer(Layer):
+#     def __init__(self, kernel_size, **kwargs):
+#         super(SeriesDecompLayer, self).__init__(**kwargs)
+#         self.kernel_size = kernel_size
+#         self.padding = (kernel_size - 1) // 2
+#         self.pool = tf.keras.layers.AveragePooling1D(pool_size=kernel_size, strides=1, padding='valid')
+
+#     def call(self, x):
+#         x_padded = tf.pad(x, [[0, 0], [self.padding, self.padding], [0, 0]], mode='REFLECT')
+#         moving_mean = self.pool(x_padded)
+#         trend = moving_mean
+#         residual = x - moving_mean
+#         return residual, trend
+
+#     def compute_output_shape(self, input_shape):
+#         batch_size, seq_len, channels = input_shape
+#         output_shape = (batch_size, seq_len, channels)
+#         return output_shape, output_shape
+
+# import tensorflow as tf
+# from tensorflow.keras.layers import Layer
+
+# class FedformerAttentionLayer(Layer):
+#     def call(self, x):
+#         # x: (batch, seq_len, d_model)
+#         # 복소수 변환은 call 내부에서 실행되므로 KerasTensor 문제가 발생하지 않습니다.
+#         x_complex = tf.complex(x, tf.zeros_like(x))
+#         fft_x = tf.signal.fft(x_complex)
+#         amplitude = tf.abs(fft_x)
+#         phase = tf.math.angle(fft_x)
+
+        
+#         # amplitude에 softmax 적용 (여기서는 axis=1: 주파수 축)
+#         weights = tf.nn.softmax(amplitude, axis=1)
+        
+#         # 가중치 곱을 통해 FFT 값을 필터링한 후 재구성
+#         fft_x_filtered = tf.complex(
+#             weights * amplitude * tf.cos(phase),
+#             weights * amplitude * tf.sin(phase)
+#         )
+#         # 역 FFT를 통해 필터링된 시계열 복원
+#         x_filtered = tf.signal.ifft(fft_x_filtered)
+#         x_filtered = tf.math.real(x_filtered)
+#         return x_filtered
+# def fedformer_attention(x):
+#     return FedformerAttentionLayer()(x)
+
+# # Fedformer 스타일 블록
+# def FedformerBlock(x, kernel_size=25, dropout=0.0):
+#     # Series Decomposition을 통해 추세와 계절성(잔차)를 분리합니다.
+#     residual, trend = SeriesDecompLayer(kernel_size)(x)
+    
+#     # 잔차 부분에 대해 Fedformer Attention 적용
+#     attn_out = fedformer_attention(residual)
+#     attn_out = Dropout(dropout)(attn_out)
+    
+#     # 입력과 attention 결과를 합산하고 normalization 적용
+#     x = Add()([x, attn_out])
+#     x = LayerNormalization()(x)
+    
+#     # Feed-Forward 네트워크
+#     ff = Dense(x.shape[-1], activation='relu')(x)
+#     ff = Dropout(dropout)(ff)
+#     ff = Dense(x.shape[-1])(ff)
+#     x = Add()([x, ff])
+#     x = LayerNormalization()(x)
+    
+#     return x
+
+# # Transformer_COMBDAE 모델에서 FedformerBlock 적용
+# def Transformer_COMBDAE(signal_size=sigLen, 
+#                          head_size=64, num_heads=16, ff_dim=64, 
+#                          num_transformer_blocks=4, dropout=0):
+#     input_shape = (signal_size, 1)
+#     time_input = Input(shape=input_shape)
+#     freq_input = Input(shape=input_shape)
+    
+#     # 인코더: 시간 도메인 처리 (기존 Conv1D 기반)
+#     x0 = Conv1D(filters=16, kernel_size=ks, activation='linear', strides=2, padding='same')(time_input)
+#     x0 = Activation('sigmoid')(x0)
+#     x0_ = Conv1D(filters=16, kernel_size=ks, activation=None, strides=2, padding='same')(time_input)
+#     xmul0 = Multiply()([x0, x0_])
+#     xmul0 = BatchNormalization()(xmul0)
+    
+#     x1 = Conv1D(filters=32, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul0)
+#     x1 = Activation('sigmoid')(x1)
+#     x1_ = Conv1D(filters=32, kernel_size=ks, activation=None, strides=2, padding='same')(xmul0)
+#     xmul1 = Multiply()([x1, x1_])
+#     xmul1 = BatchNormalization()(xmul1)
+    
+#     x2 = Conv1D(filters=64, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul1)
+#     x2 = Activation('sigmoid')(x2)
+#     x2_ = Conv1D(filters=64, kernel_size=ks, activation='elu', strides=2, padding='same')(xmul1)
+#     xmul2 = Multiply()([x2, x2_])
+#     xmul2 = BatchNormalization()(xmul2)
+    
+#     # 주파수 도메인 분기: 기존 frequency_branch 사용 (별도 구현되어 있다고 가정)
+#     f2 = frequency_branch(freq_input, 16, 13)
+    
+#     # 시간 및 주파수 도메인 특징 결합 + 위치 임베딩 (TFPositionalEncoding1D는 별도 구현)
+#     combined = Concatenate()([xmul2, f2])
+#     position_embed = TFPositionalEncoding1D(signal_size)
+#     x3 = combined + position_embed(combined)
+    
+#     # Fedformer Block 여러 개 적용 (기존 AutoformerBlock 대신 FedformerBlock 사용)
+#     x = x3
+#     for _ in range(num_transformer_blocks):
+#         x = FedformerBlock(x, kernel_size=25, dropout=dropout)
+    
+#     x4 = x
+#     x5 = Conv1DTranspose(input_tensor=x4, filters=64, kernel_size=ks, activation='elu', strides=1, padding='same')
+#     x5 = Add()([x5, xmul2])
+#     x5 = BatchNormalization()(x5)
+    
+#     x6 = Conv1DTranspose(input_tensor=x5, filters=32, kernel_size=ks, activation='elu', strides=2, padding='same')
+#     x6 = Add()([x6, xmul1])
+#     x6 = BatchNormalization()(x6)
+    
+#     x7 = Conv1DTranspose(input_tensor=x6, filters=16, kernel_size=ks, activation='elu', strides=2, padding='same')
+#     x7 = Add()([x7, xmul0])
+#     x8 = BatchNormalization()(x7)
+    
+#     predictions = Conv1DTranspose(input_tensor=x8, filters=1, kernel_size=ks, activation='linear', strides=2, padding='same')
+    
+#     model = Model(inputs=[time_input, freq_input], outputs=predictions)
+#     return model

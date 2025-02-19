@@ -83,21 +83,20 @@ def Data_Preparation_with_Fourier(samples, fs=360):
 
     print(f"[INFO] Loaded QTDatabase with {len(qtdb.keys())} signals")
     # Load combined noise
-    with open('data/CombinedNoise.pkl', 'rb') as input:
+    with open('data/CombinedNoise_Train.pkl', 'rb') as input:
         combined_noise = pickle.load(input)
-    with open('data/CombinedNoise.pkl', 'rb') as input:
+    with open('data/CombinedNoise_Test.pkl', 'rb') as input:
         static_noise = pickle.load(input)
     print(f"[INFO] Loaded CombinedNoise with {len(combined_noise)} channels")
-    total_length = combined_noise.shape[1]  # 650000 samples
-    half_length = total_length // 2
+    total_length = combined_noise.shape[0]  # 650000 samples
+    # half_length = total_length // 2
 
     # Train Noise:
-    train_noise_1 = combined_noise[0][:half_length, 0]  # Upper half of channel 1
-    train_noise_2 = combined_noise[1][half_length:, 0]  # Lower half of channel 2
+    train_noise_1 = combined_noise[:total_length, 0]  # Upper half of channel 1
+    # train_noise_2 = combined_noise[half_length:, 0]  # Lower half of channel 2
 
     # Test Noise:
-    test_noise_1 = static_noise[0][half_length:, 0]  # Lower half of channel 1
-    test_noise_2 = static_noise[1][:half_length, 0]  # Upper half of channel 2
+    test_noise_1 = static_noise[:total_length, 0]  # Lower half of channel 1
 
     #####################################
     # Data split
@@ -160,21 +159,15 @@ def Data_Preparation_with_Fourier(samples, fs=360):
     # To ensure equal selection of channels
     # Adding noise to train
     for beat_idx, beat in enumerate(beats_train):
-        # if np.random.rand() < channel_ratio:
-        # if (beat_idx // 10) % 2 == 0:
-        #     selected_channel = beat_idx % 2  # 0과 1을 번갈아 선택
-        # else:
-        #     selected_channel = (beat_idx + 1) % 2  # 반대 순서로 선택
-        if beat_idx % 2 == 0:
-            noise_source = train_noise_1  # Upper half of channel 1
-        else:
-            noise_source = train_noise_2  # Lower half of channel 2
+        # if beat_idx % 2 == 0:
+        #     noise_source = train_noise_1  # Upper half of channel 1
+        noise_source = train_noise_1  # Upper half of channel 1
         # 노이즈 조합도 순차적으로 선택, 주기적으로 변화를 줌 (매 8회 주기)
         # noise_combination_idx = (beat_idx % 7) + 1  # 1부터 7까지 순차적으로 선택
         # noise_combination_idx = 0         
         # noise = combined_noise[selected_channel][:, noise_combination_idx]
-        # noise_segment = noise[noise_index:noise_index + samples]
         noise_segment = noise_source[noise_index:noise_index + samples]
+        # noise_segment = noise_source[noise_index:noise_index + samples-1]
         # beat_max_value = np.max(beat) - np.min(beat)
         # noise_max_value = np.max(noise_segment) - np.min(noise_segment)
         # if noise_max_value == 0:
@@ -201,17 +194,14 @@ def Data_Preparation_with_Fourier(samples, fs=360):
         
     for beat_idx, beat in enumerate(beats_test):
         # if np.random.rand() < channel_ratio:
-        if beat_idx % 2 == 0:
-            noise_source = test_noise_1  # Lower half of channel 1
-        else:
-            noise_source = test_noise_2  # Upper half of channel 2
+        noise_source = test_noise_1  # Lower half of channel 1
         # 노이즈 조합도 순차적으로 선택, 주기적으로 변화를 줌 (매 8회 주기)
         # noise_combination_idx = (beat_idx % 7) + 1  # 1부터 7까지 순차적으로 선택
         # noise_combination_idx = 0  # 1부터 7까지 순차적으로 선택
         # # noise = combined_noise[selected_channel][:, noise_combination_idx]
         # noise = static_noise[selected_channel][:, noise_combination_idx]
-        # noise_segment = noise[noise_index:noise_index + samples]
         noise_segment = noise_source[noise_index:noise_index + samples]
+        # noise_segment = noise_source[noise_index:noise_index + samples-1]
         # beat_max_value = np.max(beat) - np.min(beat)
         # noise_max_value = np.max(noise_segment) - np.min(noise_segment)
         # if noise_max_value == 0:

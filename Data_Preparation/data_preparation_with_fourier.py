@@ -83,10 +83,10 @@ def Data_Preparation_with_Fourier(samples, fs=360):
 
     print(f"[INFO] Loaded QTDatabase with {len(qtdb.keys())} signals")
     # Load combined noise
-    # with open('data/CombinedNoise.pkl', 'rb') as input:
-    #     combined_noise = pickle.load(input)
-    with open('data/StaticNoise.pkl', 'rb') as input:
+    with open('data/CombinedNoise.pkl', 'rb') as input:
         combined_noise = pickle.load(input)
+    with open('data/CombinedNoise.pkl', 'rb') as input:
+        static_noise = pickle.load(input)
     print(f"[INFO] Loaded CombinedNoise with {len(combined_noise)} channels")
 
     #####################################
@@ -161,8 +161,8 @@ def Data_Preparation_with_Fourier(samples, fs=360):
         noise_combination_idx = 0         
         noise = combined_noise[selected_channel][:, noise_combination_idx]
         noise_segment = noise[noise_index:noise_index + samples]
-        beat_max_value = np.max(beat) - np.min(beat)
-        noise_max_value = np.max(noise_segment) - np.min(noise_segment)
+        # beat_max_value = np.max(beat) - np.min(beat)
+        # noise_max_value = np.max(noise_segment) - np.min(noise_segment)
         # if noise_max_value == 0:
         #     Ase = 1  # 기본값 설정
         # else:
@@ -194,10 +194,11 @@ def Data_Preparation_with_Fourier(samples, fs=360):
         # 노이즈 조합도 순차적으로 선택, 주기적으로 변화를 줌 (매 8회 주기)
         # noise_combination_idx = (beat_idx % 7) + 1  # 1부터 7까지 순차적으로 선택
         noise_combination_idx = 0  # 1부터 7까지 순차적으로 선택
-        noise = combined_noise[selected_channel][:, noise_combination_idx]
+        # noise = combined_noise[selected_channel][:, noise_combination_idx]
+        noise = static_noise[selected_channel][:, noise_combination_idx]
         noise_segment = noise[noise_index:noise_index + samples]
-        beat_max_value = np.max(beat) - np.min(beat)
-        noise_max_value = np.max(noise_segment) - np.min(noise_segment)
+        # beat_max_value = np.max(beat) - np.min(beat)
+        # noise_max_value = np.max(noise_segment) - np.min(noise_segment)
         # if noise_max_value == 0:
         #     Ase = 1  # 기본값 설정
         # else:

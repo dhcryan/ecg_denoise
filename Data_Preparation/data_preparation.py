@@ -22,8 +22,8 @@ def Data_Preparation(samples):
     # # Load combined noise
     with open('data/CombinedNoise.pkl', 'rb') as input:
         combined_noise = pickle.load(input)
-    # with open('data/StaticNoise.pkl', 'rb') as input:
-    #     combined_noise = pickle.load(input)
+    with open('data/CombinedNoise.pkl', 'rb') as input:
+        static_noise = pickle.load(input)
     print(f"[INFO] Loaded CombinedNoise with {len(combined_noise)} channels")
 
     #####################################
@@ -92,8 +92,8 @@ def Data_Preparation(samples):
         # noise_combination_idx=7
         noise = combined_noise[selected_channel][:, noise_combination_idx]
         noise_segment = noise[noise_index:noise_index + samples]
-        beat_max_value = np.max(beat) - np.min(beat)
-        noise_max_value = np.max(noise_segment) - np.min(noise_segment)
+        # beat_max_value = np.max(beat) - np.min(beat)
+        # noise_max_value = np.max(noise_segment) - np.min(noise_segment)
         # if noise_max_value == 0:
         #     Ase = 1  # 기본값 설정
         # else:
@@ -125,17 +125,19 @@ def Data_Preparation(samples):
         # noise_combination_idx = (beat_idx % 7) + 1  # 1부터 7까지 순차적으로 선택
         noise_combination_idx = 0
         # noise_combination_idx=7
-        noise = combined_noise[selected_channel][:, noise_combination_idx]
+        # noise = combined_noise[selected_channel][:, noise_combination_idx]
+        noise = static_noise[selected_channel][:, noise_combination_idx]
         noise_segment = noise[noise_index:noise_index + samples]
-        beat_max_value = np.max(beat) - np.min(beat)
-        noise_max_value = np.max(noise_segment) - np.min(noise_segment)
+        # beat_max_value = np.max(beat) - np.min(beat)
+        # noise_max_value = np.max(noise_segment) - np.min(noise_segment)
         # if noise_max_value == 0:
         #     Ase = 1  # 기본값 설정
         # else:
         #     Ase = noise_max_value / beat_max_value
-        # alpha = rnd_test[beat_idx] / Ase
-        # signal_noise = beat + alpha * noise_segment
+        # alpha = rnd_train[beat_idx] / Ase
         signal_noise = beat + noise_segment
+        # signal_noise = beat + alpha * noise_segment
+        # signal_noise = beat + noise_segment
         sn_test.append(signal_noise)
         noise_indices_test.append(noise_combination_idx)  # 노이즈 인덱스 저장
         noise_index += samples

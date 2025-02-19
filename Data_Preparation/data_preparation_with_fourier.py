@@ -88,6 +88,16 @@ def Data_Preparation_with_Fourier(samples, fs=360):
     with open('data/CombinedNoise.pkl', 'rb') as input:
         static_noise = pickle.load(input)
     print(f"[INFO] Loaded CombinedNoise with {len(combined_noise)} channels")
+    total_length = combined_noise.shape[1]  # 650000 samples
+    half_length = total_length // 2
+
+    # Train Noise:
+    train_noise_1 = combined_noise[0][:half_length, 0]  # Upper half of channel 1
+    train_noise_2 = combined_noise[1][half_length:, 0]  # Lower half of channel 2
+
+    # Test Noise:
+    test_noise_1 = static_noise[0][half_length:, 0]  # Lower half of channel 1
+    test_noise_2 = static_noise[1][:half_length, 0]  # Upper half of channel 2
 
     #####################################
     # Data split
@@ -151,16 +161,20 @@ def Data_Preparation_with_Fourier(samples, fs=360):
     # Adding noise to train
     for beat_idx, beat in enumerate(beats_train):
         # if np.random.rand() < channel_ratio:
-        if (beat_idx // 10) % 2 == 0:
-            selected_channel = beat_idx % 2  # 0과 1을 번갈아 선택
+        # if (beat_idx // 10) % 2 == 0:
+        #     selected_channel = beat_idx % 2  # 0과 1을 번갈아 선택
+        # else:
+        #     selected_channel = (beat_idx + 1) % 2  # 반대 순서로 선택
+        if beat_idx % 2 == 0:
+            noise_source = train_noise_1  # Upper half of channel 1
         else:
-            selected_channel = (beat_idx + 1) % 2  # 반대 순서로 선택
-
+            noise_source = train_noise_2  # Lower half of channel 2
         # 노이즈 조합도 순차적으로 선택, 주기적으로 변화를 줌 (매 8회 주기)
         # noise_combination_idx = (beat_idx % 7) + 1  # 1부터 7까지 순차적으로 선택
-        noise_combination_idx = 0         
-        noise = combined_noise[selected_channel][:, noise_combination_idx]
-        noise_segment = noise[noise_index:noise_index + samples]
+        # noise_combination_idx = 0         
+        # noise = combined_noise[selected_channel][:, noise_combination_idx]
+        # noise_segment = noise[noise_index:noise_index + samples]
+        noise_segment = noise_source[noise_index:noise_index + samples]
         # beat_max_value = np.max(beat) - np.min(beat)
         # noise_max_value = np.max(noise_segment) - np.min(noise_segment)
         # if noise_max_value == 0:
@@ -173,10 +187,10 @@ def Data_Preparation_with_Fourier(samples, fs=360):
         sn_train.append(signal_noise)
         fourier_transformed_x = make_fourier(signal_noise.reshape(1, -1), samples, fs)  # X에 대한 Fourier 변환
         fourier_train_x.append(fourier_transformed_x[0])  # Append the single batch
-        noise_indices_train.append(noise_combination_idx)  # 노이즈 인덱스 저장
+        # noise_indices_train.append(noise_combination_idx)  # 노이즈 인덱스 저장
         noise_index += samples
         # 노이즈 크기 650000 넘어가면 초기화
-        if noise_index > (len(noise) - samples):
+        if noise_index > (len(noise_source) - samples):
             noise_index = 0
 
     # Adding noise to test
@@ -187,16 +201,17 @@ def Data_Preparation_with_Fourier(samples, fs=360):
         
     for beat_idx, beat in enumerate(beats_test):
         # if np.random.rand() < channel_ratio:
-        if (beat_idx // 10) % 2 == 1:
-            selected_channel = beat_idx % 2  # 0과 1을 번갈아 선택
+        if beat_idx % 2 == 0:
+            noise_source = test_noise_1  # Lower half of channel 1
         else:
-            selected_channel = (beat_idx + 1) % 2  # 반대 순서로 선택
+            noise_source = test_noise_2  # Upper half of channel 2
         # 노이즈 조합도 순차적으로 선택, 주기적으로 변화를 줌 (매 8회 주기)
         # noise_combination_idx = (beat_idx % 7) + 1  # 1부터 7까지 순차적으로 선택
-        noise_combination_idx = 0  # 1부터 7까지 순차적으로 선택
-        # noise = combined_noise[selected_channel][:, noise_combination_idx]
-        noise = static_noise[selected_channel][:, noise_combination_idx]
-        noise_segment = noise[noise_index:noise_index + samples]
+        # noise_combination_idx = 0  # 1부터 7까지 순차적으로 선택
+        # # noise = combined_noise[selected_channel][:, noise_combination_idx]
+        # noise = static_noise[selected_channel][:, noise_combination_idx]
+        # noise_segment = noise[noise_index:noise_index + samples]
+        noise_segment = noise_source[noise_index:noise_index + samples]
         # beat_max_value = np.max(beat) - np.min(beat)
         # noise_max_value = np.max(noise_segment) - np.min(noise_segment)
         # if noise_max_value == 0:
@@ -209,11 +224,12 @@ def Data_Preparation_with_Fourier(samples, fs=360):
         sn_test.append(signal_noise)
         fourier_transformed_x = make_fourier(signal_noise.reshape(1, -1), samples, fs)  # X에 대한 Fourier 변환
         fourier_test_x.append(fourier_transformed_x[0])  # Append the single batch
-        noise_indices_test.append(noise_combination_idx)  # 노이즈 인덱스 저장
+        # noise_indices_test.append(noise_combination_idx)  # 노이즈 인덱스 저장
         noise_index += samples
-        if noise_index > (len(noise) - samples):
+        # if noise_index > (len(noise) - samples):
+        #     noise_index = 0
+        if noise_index > (len(noise_source) - samples):
             noise_index = 0
-
 
     X_train = np.array(sn_train)[valid_train_indices]  # Match noisy and original beats
     X_test = np.array(sn_test)[valid_test_indices]
@@ -246,4 +262,4 @@ def Data_Preparation_with_Fourier(samples, fs=360):
     print(f"[INFO] Fourier shapes -> F_train_x: {F_train_x.shape}, F_train_y: {F_train_y.shape}, F_test_x: {F_test_x.shape}, F_test_y: {F_test_y.shape}")
     print('Dataset ready to use.')
 
-    return Dataset, valid_train_indices, valid_test_indices, noise_indices_train, noise_indices_test
+    return Dataset, valid_train_indices, valid_test_indices

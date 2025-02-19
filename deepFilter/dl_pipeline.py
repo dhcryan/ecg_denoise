@@ -119,31 +119,31 @@ def train_dl(Dataset, experiment):
                                  mode='min',  # on acc has to go max
                                  save_weights_only=True)
 
-    reduce_lr = ReduceLROnPlateau(monitor="val_loss",
-                                factor=0.5,           # 학습률 감소 비율은 그대로 유지
-                                min_delta=0.005,      # min_delta를 0.05에서 0.001로 줄여 작은 개선도 감지
-                                mode='min',           # val_loss 최소화를 목표로 함
-                                patience=10,          # patience를 2에서 10으로 늘려 학습률 감소 시점을 늦춤
-                                verbose=1)
-
-    early_stop = EarlyStopping(monitor="val_loss",  
-                            min_delta=0.001,       # 개선 판단을 위한 최소 변화량
-                            mode='min',             # val_loss 최소화를 목표로 함
-                            patience=40,            # patience를 50에서 20으로 줄여 더 빠른 조기 종료
-                            verbose=1)
     # reduce_lr = ReduceLROnPlateau(monitor="val_loss",
-    #                               factor=0.5,
-    #                               min_delta=0.05,
-    #                               mode='min',  # on acc has to go max
-    #                               patience=2,
-    #                               min_lr=minimum_lr,
-    #                               verbose=1)
+    #                             factor=0.5,           # 학습률 감소 비율은 그대로 유지
+    #                             min_delta=0.005,      # min_delta를 0.05에서 0.001로 줄여 작은 개선도 감지
+    #                             mode='min',           # val_loss 최소화를 목표로 함
+    #                             patience=10,          # patience를 2에서 10으로 늘려 학습률 감소 시점을 늦춤
+    #                             verbose=1)
 
-    # early_stop = EarlyStopping(monitor="val_loss",  # "val_loss"
-    #                            min_delta=0.05,
-    #                            mode='min',  # on acc has to go max
-    #                            patience=10,
-    #                            verbose=1)
+    # early_stop = EarlyStopping(monitor="val_loss",  
+    #                         min_delta=0.001,       # 개선 판단을 위한 최소 변화량
+    #                         mode='min',             # val_loss 최소화를 목표로 함
+    #                         patience=40,            # patience를 50에서 20으로 줄여 더 빠른 조기 종료
+    #                         verbose=1)
+    reduce_lr = ReduceLROnPlateau(monitor="val_loss",
+                                  factor=0.5,
+                                  min_delta=0.05,
+                                  mode='min',  # on acc has to go max
+                                  patience=2,
+                                  min_lr=minimum_lr,
+                                  verbose=1)
+
+    early_stop = EarlyStopping(monitor="val_loss",  # "val_loss"
+                               min_delta=0.05,
+                               mode='min',  # on acc has to go max
+                               patience=10,
+                               verbose=1)
     tb_log_dir = './runs_' + current_date +'/' + model_label
     # 디렉토리가 존재하지 않으면 생성
     if not os.path.exists(tb_log_dir):

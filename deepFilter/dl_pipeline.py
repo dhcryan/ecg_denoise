@@ -37,7 +37,7 @@ def train_dl(Dataset, experiment):
 
     print('Deep Learning pipeline: Training the model for exp ' + str(experiment))
     
-    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_COMBDAE_updated']:
+    if experiment in ['Transformer_COMBDAE']:
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
 
         X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.3, shuffle=True, random_state=1)
@@ -260,7 +260,7 @@ def test_dl(Dataset, experiment):
     # load weights
     model.load_weights(model_filepath)
     
-    if experiment in ['Transformer_COMBDAE','Transformer_COMBDAE_FreTS','Transformer_COMBDAE_updated']:
+    if experiment in ['Transformer_COMBDAE']:
         # Test score
         y_pred = model.predict([X_test, F_test_x], batch_size=batch_size, verbose=1)
 

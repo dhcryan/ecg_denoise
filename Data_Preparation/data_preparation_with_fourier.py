@@ -82,29 +82,23 @@ def Data_Preparation_with_Fourier(samples, fs=360):
         qtdb = pickle.load(input)
 
     print(f"[INFO] Loaded QTDatabase with {len(qtdb.keys())} signals")
-    # Load combined noise
+    # # Load combined noise
     with open('data/CombinedNoise_Train.pkl', 'rb') as input:
         combined_noise = pickle.load(input)
     with open('data/CombinedNoise_Test.pkl', 'rb') as input:
         static_noise = pickle.load(input)
     print(f"[INFO] Loaded CombinedNoise with {len(combined_noise)} channels")
     total_length = combined_noise.shape[0]  # 650000 samples
-    # half_length = total_length // 2
-
-    # Train Noise:
-    train_noise_1 = combined_noise[:total_length, 0]  # Upper half of channel 1
-    # train_noise_2 = combined_noise[half_length:, 0]  # Lower half of channel 2
-
+    half_length = total_length // 2
+    train_noise_1 = combined_noise
     # Test Noise:
-    test_noise_1 = static_noise[:total_length, 0]  # Lower half of channel 1
-
+    test_noise_1 = static_noise
     #####################################
     # Data split
     #####################################
     test_set = ['sel123', 'sel233', 'sel302', 'sel307', 'sel820', 'sel853', 
                 'sel16420', 'sel16795', 'sele0106', 'sele0121', 'sel32', 'sel49', 
                 'sel14046', 'sel15814']
-
     beats_train = []
     beats_test = []
     fourier_train_x = []

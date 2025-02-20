@@ -4,7 +4,9 @@ from scipy.signal import resample_poly
 import wfdb
 import math
 import _pickle as pickle
-
+import numpy as np
+import pickle
+import wfdb
 
 def Data_Preparation(samples):
     print('Getting the Data ready ...')
@@ -24,10 +26,10 @@ def Data_Preparation(samples):
         static_noise = pickle.load(input)
     print(f"[INFO] Loaded CombinedNoise with {len(combined_noise)} channels")
     total_length = combined_noise.shape[0]  # 650000 samples
-    # Train Noise:
-    train_noise_1 = combined_noise[:total_length, 0]  # Upper half of channel 1
+    half_length = total_length // 2
+    train_noise_1 = combined_noise
     # Test Noise:
-    test_noise_1 = static_noise[:total_length, 0]  # Lower half of channel 1
+    test_noise_1 = static_noise
     #####################################
     # Data split
     #####################################
@@ -41,8 +43,6 @@ def Data_Preparation(samples):
     valid_test_indices = []   # To keep track of valid indices in test data
     sn_train = []
     sn_test = []
-    noise_indices_train = []
-    noise_indices_test = []    
     
     skip_beats = 0
     # samples = 512
@@ -71,7 +71,7 @@ def Data_Preparation(samples):
                 valid_train_indices.append(len(beats_train) - 1)  # Track valid train beat index
 
         print(f"[DEBUG] Processed signal {signal_name}, total beats in train: {len(beats_train)}, total beats in test: {len(beats_test)}")
-
+    # Compute ECG Power for Train & Test
     #####################################
     # Adding noise to train and test sets
     #####################################
@@ -87,8 +87,6 @@ def Data_Preparation(samples):
         noise_index += samples
         if noise_index > (len(noise_source) - samples):
             noise_index = 0
-
-                
     # Adding noise to test
     noise_index = 0
     rnd_test = np.random.randint(low=20, high=200, size=len(beats_test)) / 100

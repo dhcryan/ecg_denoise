@@ -864,7 +864,7 @@ class TFPositionalEncoding1D(tf.keras.layers.Layer):
 
         return self.cached_penc
         
-def Transformer_DAE(signal_size = sigLen,head_size=64,num_heads=16,ff_dim=64,num_transformer_blocks=2, dropout=0):   ###paper 1 model
+def Transformer_DAE(signal_size = sigLen,head_size=64,num_heads=2,ff_dim=64,num_transformer_blocks=4, dropout=0):   ###paper 1 model
 
     input_shape = (signal_size, 1)
     input = Input(shape=input_shape)
@@ -1045,7 +1045,7 @@ def frequency_branch(input_tensor, filters, kernel_size=13):
 #     return xmul2
 
 
-def Transformer_COMBDAE(signal_size = sigLen,head_size=64,num_heads=16,ff_dim=64,num_transformer_blocks=8, dropout=0):   ###paper 1 model
+def Transformer_COMBDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_transformer_blocks=8, dropout=0):   ###paper 1 model
     input_shape = (signal_size, 1)
     time_input = Input(shape=input_shape)
     

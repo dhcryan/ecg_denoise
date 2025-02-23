@@ -42,6 +42,99 @@ def make_fourier_ifft(inputs, n, fs):
 
     return np.asarray(signal_list)
 
+
+# from scipy.fft import fft, ifft
+
+# def make_fourier(inputs, n, fs):
+#     """
+#     특정 주파수 대역만 유지하는 FFT 변환.
+    
+#     Parameters:
+#     inputs: 원본 신호 (2D 배열 - (배치 크기, 샘플 수))
+#     n: FFT 샘플 수
+#     fs: 샘플링 주파수 (예: 360 Hz)
+#     low_cut: 유지할 주파수 대역의 하한 (Hz)
+#     high_cut: 유지할 주파수 대역의 상한 (Hz)
+    
+#     Returns:
+#     특정 주파수 대역만 유지한 신호 (IFFT 후 time-domain으로 변환)
+#     """
+#     print(f"Input shape: {inputs.shape}")
+    
+#     T = n / fs
+#     k = np.arange(n)
+#     freq = k / T
+#     freq = freq[range(int(n / 2))]  # Nyquist 주파수까지 선택
+#     print(f"Freq shape: {freq.shape}")
+    
+#     signal_list = []
+#     for i in range(inputs.shape[0]):
+#         y = inputs[i, :]
+#         # print(f"Signal {i} shape: {y.shape}")
+#         # Signal 0 shape: (512,)
+#         Y = fft(y) / n  # FFT 수행 후 정규화
+#         # print(f"FFT output shape: {Y.shape}")
+#         # FFT output shape: (512,)
+#         # 특정 주파수 대역 필터링
+#         Y_filtered = np.zeros_like(Y)
+#         mask = (freq >= 0.5) & (freq <= 50)
+#         # print(f"Mask shape: {mask.shape}")
+#         # Mask shape: (256,)
+#         Y_filtered[:len(mask)][mask] = Y[:len(mask)][mask]  # 특정 대역만 유지
+# #         print(f"Filtered FFT shape: {Y_filtered.shape}")
+# # Filtered FFT shape: (512,)
+#         # IFFT로 복원
+#         # Y_ifft = ifft(Y_filtered)  
+#         # ifft_transformed = np.real(Y_ifft)
+#         # print(f"IFFT output shape: {ifft_transformed.shape}")
+#         # IFFT output shape: (512,)
+#         # IFFT output shape: (512,)
+#         signal_list.append(Y_filtered)
+
+#     output = np.asarray(signal_list)
+#     # print(f"Final output shape: {output.shape}")
+#     # Final output shape: (1, 512)
+
+#     return output
+
+# import numpy as np
+# from scipy.fft import fft
+
+# def make_fourier(inputs, n, fs):
+#     """
+#     주파수 대역별 가중치를 적용한 Fourier 변환.
+#     inputs: 입력 신호 (2D 배열 - (배치 크기, 샘플 수))
+#     n: FFT 샘플 수
+#     fs: 샘플링 주파수 (예: 360 Hz)
+#     """
+#     T = n / fs
+#     k = np.arange(n)
+#     freq = k / T  # 주파수 배열 (0 ~ fs/2)
+#     freq = freq[range(int(n / 2))]  # Nyquist 주파수까지 선택 (0 ~ 180 Hz)
+
+#     # 주파수 대역별 가중치 정의 (이미지 및 코드 참고)
+#     weights = np.ones_like(freq)  # 기본 가중치 1
+#     # 신호가 강한 저주파수 대역(0~20 Hz) 강조 (가중치 1.5)
+#     weights[(freq >= 0) & (freq <= 20)] = 1.5
+#     # 전력선 노이즈(50~60 Hz) 억제 (가중치 0.1)
+#     weights[(freq >= 50) & (freq <= 60)] = 0.1
+#     # 불필요한 고주파수(80~180 Hz) 억제 (가중치 0.05)
+#     weights[(freq >= 80) & (freq <= 180)] = 0.05
+
+#     signal_list = []
+#     for i in range(inputs.shape[0]):
+#         y = inputs[i, :]
+#         Y = fft(y) / n  # FFT 수행 후 정규화
+#         Y_mag = np.abs(Y[range(int(n / 2))]) * weights  # 주파수 대역별 가중치 적용
+#         Y_full = np.hstack([Y_mag, Y_mag])  # 시간 도메인 크기(512)로 확장
+#         signal_list.append(Y_full)
+
+#     return np.asarray(signal_list)
+
+# 사용 예시
+# X_test = np.random.randn(13316, 512, 1)  # 예시 데이터
+# F_test_x_weighted = make_fourier_weighted(X_test.squeeze(-1), 512, 360)
+# print("Weighted Fourier shape:", F_test_x_weighted.shape)  # (13316, 512)
 def make_fourier(inputs, n, fs):
     """
     주파수 도메인 정보 추출 및 time-domain과 같은 shape으로 만듦.
@@ -159,9 +252,10 @@ def Data_Preparation_with_Fourier(samples, fs=360):
         noise_segment = noise_source[noise_index:noise_index + samples]
         signal_noise = beat + noise_segment
         sn_train.append(signal_noise)
+        # print(signal_noise.shape) 512
         fourier_transformed_x = make_fourier(signal_noise.reshape(1, -1), samples, fs)  # X에 대한 Fourier 변환
         fourier_train_x.append(fourier_transformed_x[0])  # Append the single batch
-        # noise_indices_train.append(noise_combination_idx)  # 노이즈 인덱스 저장
+        # print(f'fourier_transformed_x shape: {fourier_transformed_x.shape}') (1, 512)
         noise_index += samples
         # 노이즈 크기 650000 넘어가면 초기화
         if noise_index > (len(noise_source) - samples):

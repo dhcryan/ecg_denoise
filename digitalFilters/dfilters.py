@@ -37,10 +37,10 @@ def Data_Preparation(samples):
     print(f"[INFO] Loaded QTDatabase with {len(qtdb.keys())} signals")
 
     # Load combined noise
-    with open('data/CombinedNoise.pkl', 'rb') as input:
+    with open('data/CombinedNoise_Train.pkl', 'rb') as input:
         combined_noise = pickle.load(input)
-    # with open('data/StaticNoise.pkl', 'rb') as input:
-    #     combined_noise = pickle.load(input)
+    with open('data/CombinedNoise_Test.pkl', 'rb') as input:
+        static_noise = pickle.load(input)
     print(f"[INFO] Loaded CombinedNoise with {len(combined_noise)} channels")
 
     #####################################
@@ -49,15 +49,18 @@ def Data_Preparation(samples):
     test_set = ['sel123', 'sel233', 'sel302', 'sel307', 'sel820', 'sel853', 
                 'sel16420', 'sel16795', 'sele0106', 'sele0121', 'sel32', 'sel49', 
                 'sel14046', 'sel15814']
-
+    total_length = combined_noise.shape[0]  # 650000 samples
+    half_length = total_length // 2
+    train_noise_1 = combined_noise
+    # Test Noise:
+    test_noise_1 = static_noise
     beats_train = []
     beats_test = []
     valid_train_indices = []  # To keep track of valid indices in training data
     valid_test_indices = []   # To keep track of valid indices in test data
     sn_train = []
     sn_test = []
-    noise_indices_train = []
-    noise_indices_test = []    
+
     
     skip_beats = 0
     # samples = 512
@@ -93,37 +96,15 @@ def Data_Preparation(samples):
     print(f"[INFO] Adding noise to train and test sets")
     # Random scaling factor for train and test
     # size=len(beats_train): beats_train의 길이만큼 난수를 생성합니다. 즉, beats_train에 있는 심박 데이터의 개수와 동일한 수의 난수를 생성합니다.
-    rnd_train = np.random.randint(low=20, high=200, size=len(beats_train)) / 100
-    noise_index = 0
-    # Adding noise to train
-    # https://chatgpt.com/g/g-cKXjWStaE-python/c/66e1471b-57b4-8006-b921-233e7803fcab
+    noise_index = 0    
     for beat_idx, beat in enumerate(beats_train):
-        if (beat_idx // 10) % 2 == 0:
-            selected_channel = beat_idx % 2  # 0과 1을 번갈아 선택
-        else:
-            selected_channel = (beat_idx + 1) % 2  # 반대 순서로 선택
-
-        # 노이즈 조합도 순차적으로 선택, 주기적으로 변화를 줌 (매 8회 주기)
-        # noise_combination_idx = (beat_idx % 7) + 1  # 1부터 7까지 순차적으로 선택
-        noise_combination_idx = 0
-        # noise_combination_idx=7
-        noise = combined_noise[selected_channel][:, noise_combination_idx]
-        noise_segment = noise[noise_index:noise_index + samples]
-        beat_max_value = np.max(beat) - np.min(beat)
-        noise_max_value = np.max(noise_segment) - np.min(noise_segment)
-        if noise_max_value == 0:
-            Ase = 1  # 기본값 설정
-        else:
-            Ase = noise_max_value / beat_max_value
-        alpha = rnd_train[beat_idx] / Ase
-        signal_noise = beat + alpha * noise_segment
+        noise_source = train_noise_1  # Upper half of channel 1
+        noise_segment = noise_source[noise_index:noise_index + samples]
+        signal_noise = beat + noise_segment
         sn_train.append(signal_noise)
-        noise_indices_train.append(noise_combination_idx)  # 노이즈 인덱스 저장
         noise_index += samples
-        if noise_index > (len(noise) - samples):
+        if noise_index > (len(noise_source) - samples):
             noise_index = 0
-
-                
     # Adding noise to test
     noise_index = 0
     rnd_test = np.random.randint(low=20, high=200, size=len(beats_test)) / 100
@@ -132,30 +113,47 @@ def Data_Preparation(samples):
     print('rnd_test shape: ' + str(rnd_test.shape))
     
     for beat_idx, beat in enumerate(beats_test):
-        # if np.random.rand() < channel_ratio:
-        if (beat_idx // 10) % 2 == 0:
-            selected_channel = beat_idx % 2  # 0과 1을 번갈아 선택
-        else:
-            selected_channel = (beat_idx + 1) % 2  # 반대 순서로 선택
-        # 노이즈 조합도 순차적으로 선택, 주기적으로 변화를 줌 (매 8회 주기)
-        # noise_combination_idx = (beat_idx % 7) + 1  # 1부터 7까지 순차적으로 선택
-        noise_combination_idx = 0
-        # noise_combination_idx=7
-        noise = combined_noise[selected_channel][:, noise_combination_idx]
-        noise_segment = noise[noise_index:noise_index + samples]
-        beat_max_value = np.max(beat) - np.min(beat)
-        noise_max_value = np.max(noise_segment) - np.min(noise_segment)
-        if noise_max_value == 0:
-            Ase = 1  # 기본값 설정
-        else:
-            Ase = noise_max_value / beat_max_value
-        alpha = rnd_test[beat_idx] / Ase
-        signal_noise = beat + alpha * noise_segment
+        noise_source = test_noise_1  # Lower half of channel 1
+        noise_segment = noise_source[noise_index:noise_index + samples]
+        signal_noise = beat + noise_segment
         sn_test.append(signal_noise)
-        noise_indices_test.append(noise_combination_idx)  # 노이즈 인덱스 저장
         noise_index += samples
-        if noise_index > (len(noise) - samples):
+        if noise_index > (len(noise_source) - samples):
             noise_index = 0
+
+                
+    # # Adding noise to test
+    # noise_index = 0
+    # rnd_test = np.random.randint(low=20, high=200, size=len(beats_test)) / 100
+    # # Saving the random array so we can use it on the amplitude segmentation tables
+    # np.save('rnd_test.npy', rnd_test)
+    # print('rnd_test shape: ' + str(rnd_test.shape))
+    
+    # for beat_idx, beat in enumerate(beats_test):
+    #     # if np.random.rand() < channel_ratio:
+    #     if (beat_idx // 10) % 2 == 0:
+    #         selected_channel = beat_idx % 2  # 0과 1을 번갈아 선택
+    #     else:
+    #         selected_channel = (beat_idx + 1) % 2  # 반대 순서로 선택
+    #     # 노이즈 조합도 순차적으로 선택, 주기적으로 변화를 줌 (매 8회 주기)
+    #     # noise_combination_idx = (beat_idx % 7) + 1  # 1부터 7까지 순차적으로 선택
+    #     noise_combination_idx = 0
+    #     # noise_combination_idx=7
+    #     noise = combined_noise[selected_channel][:, noise_combination_idx]
+    #     noise_segment = noise[noise_index:noise_index + samples]
+    #     beat_max_value = np.max(beat) - np.min(beat)
+    #     noise_max_value = np.max(noise_segment) - np.min(noise_segment)
+    #     if noise_max_value == 0:
+    #         Ase = 1  # 기본값 설정
+    #     else:
+    #         Ase = noise_max_value / beat_max_value
+    #     alpha = rnd_test[beat_idx] / Ase
+    #     signal_noise = beat + alpha * noise_segment
+    #     sn_test.append(signal_noise)
+    #     noise_indices_test.append(noise_combination_idx)  # 노이즈 인덱스 저장
+    #     noise_index += samples
+    #     if noise_index > (len(noise) - samples):
+    #         noise_index = 0
     X_train = np.array(sn_train)[valid_train_indices]  # Match noisy and original beats
     X_test = np.array(sn_test)[valid_test_indices]
 
@@ -172,7 +170,7 @@ def Data_Preparation(samples):
     print(f"[INFO] Final shapes -> X_train: {X_train.shape}, y_train: {y_train.shape}, X_test: {X_test.shape}, y_test: {y_test.shape}")
     print('Dataset ready to use.')
 
-    return Dataset, valid_train_indices, valid_test_indices, noise_indices_train, noise_indices_test
+    return Dataset, valid_train_indices, valid_test_indices
 
 
 def FIRRemoveBL(ecgy, Fs, Fc, factor):
@@ -392,13 +390,13 @@ if __name__ == "__main__":
     #ECG_Clean,N = FIRRemoveBL(signal,Fs,Fc,factor)
 
     ECG_Clean = IIRRemoveBL(signal,Fs, Fc)
-    Dataset, valid_train_indices, valid_test_indices, noise_indices_train, noise_indices_test = Data_Preparation(samples=512)
+    Dataset, valid_train_indices, valid_test_indices= Data_Preparation(samples=512)
     X_train, y_train, X_test, y_test = Dataset
-    plt.figure()
-    plt.plot(signal[0:len(ecgy['ecgy'])])
-    plt.plot(ECG_Clean)
-    plt.show()
-    plt.figure()
+    # plt.figure()
+    # plt.plot(signal[0:len(ecgy['ecgy'])])
+    # plt.plot(ECG_Clean)
+    # plt.show()
+    # plt.figure()
 # Classical Filters
     train_time_list = []
     test_time_list = []

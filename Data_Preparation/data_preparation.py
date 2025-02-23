@@ -19,9 +19,9 @@ def Data_Preparation(samples):
         qtdb = pickle.load(input)
 
     # 650000 samples
-    with open('data/CombinedNoise_Train.pkl', 'rb') as input:
+    with open('data2/CombinedNoise_Train.pkl', 'rb') as input:
         combined_noise = pickle.load(input)
-    with open('data/CombinedNoise_Test.pkl', 'rb') as input:
+    with open('data2/CombinedNoise_Test.pkl', 'rb') as input:
         static_noise = pickle.load(input)
     # with open('data/Mixed_Noise_SNR_3.pkl', 'rb') as input:
     #     static_noise = pickle.load(input)

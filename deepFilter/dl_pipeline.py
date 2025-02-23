@@ -50,7 +50,12 @@ def train_dl(Dataset, experiment):
     # ==================
     # LOAD THE DL MODEL
     # ==================
-    if experiment == 'FCN-DAE':
+    if experiment == 'CNN_DAE':
+        # FCN_DAE
+        model = CNN_DAE()
+        model_label = 'CNN_DAE'
+        
+    if experiment == 'FCN_DAE':
         # FCN_DAE
         model = FCN_DAE()
         model_label = 'FCN_DAE'
@@ -197,6 +202,11 @@ def test_dl(Dataset, experiment):
     # ==================
     # LOAD THE DL MODEL
     # ==================
+    if experiment == 'CNN_DAE':
+        # FCN_DAE
+        model = CNN_DAE()
+        model_label = 'CNN_DAE'
+        
     if experiment == 'FCN-DAE':
         # FCN_DAE
         model = FCN_DAE()

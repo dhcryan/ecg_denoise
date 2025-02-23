@@ -123,6 +123,81 @@ class FANLayer(tf.keras.layers.Layer):
         })
         return config
 
+import tensorflow as tf
+from tensorflow.keras.layers import Conv2DTranspose, Lambda
+
+
+
+import tensorflow as tf
+
+
+def Conv1DTranspose2(input_tensor, filters, kernel_size, strides=2, activation='relu', padding='same'):
+    x = Lambda(lambda x: tf.expand_dims(x, axis=2))(input_tensor)  # (batch, time, 1) -> (batch, time, 1, 1)
+    x = Conv2DTranspose(filters=filters,
+                        kernel_size=(kernel_size, 1),
+                        activation=activation,
+                        strides=(strides, 1),
+                        padding=padding)(x)
+    x = Lambda(lambda x: tf.squeeze(x, axis=2))(x)  # (batch, time, 1, filters) -> (batch, time, filters)
+    return x
+
+def CNN_DAE(signal_size=512):
+    # Implementation of FCN_DAE approach presented in
+    # Chiang, H. T., Hsieh, Y. Y., Fu, S. W., Hung, K. H., Tsao, Y., & Chien, S. Y. (2019).
+    # Noise reduction in ECG signals using fully convolutional denoising autoencoders.
+    # IEEE Access, 7, 60806-60813.
+    input_shape = (signal_size, 1)
+    input_tensor = Input(shape=input_shape)
+
+    # **Encoder (Conv1D Layers)**
+    x = Conv1D(filters=40, kernel_size=16, activation='elu', strides=2, padding='same')(input_tensor)
+    x = BatchNormalization()(x)
+
+    x = Conv1D(filters=20, kernel_size=16, activation='elu', strides=2, padding='same')(x)
+    x = BatchNormalization()(x)
+
+    x = Conv1D(filters=20, kernel_size=16, activation='elu', strides=2, padding='same')(x)
+    x = BatchNormalization()(x)
+
+    x = Conv1D(filters=20, kernel_size=16, activation='elu', strides=2, padding='same')(x)
+    x = BatchNormalization()(x)
+
+    x = Conv1D(filters=40, kernel_size=16, activation='elu', strides=2, padding='same')(x)
+    x = BatchNormalization()(x)
+
+    x = Conv1D(filters=1, kernel_size=16, activation='elu', strides=1, padding='same')(x)
+    x = BatchNormalization()(x)
+
+    # **Decoder (Conv1DTranspose2 Layers)**
+    x = Conv1DTranspose2(input_tensor=x, filters=40, kernel_size=16, activation='elu', strides=2, padding='same')
+    x = BatchNormalization()(x)
+
+    x = Conv1DTranspose2(input_tensor=x, filters=20, kernel_size=16, activation='elu', strides=2, padding='same')
+    x = BatchNormalization()(x)
+
+    x = Conv1DTranspose2(input_tensor=x, filters=20, kernel_size=16, activation='elu', strides=2, padding='same')
+    x = BatchNormalization()(x)
+
+    x = Conv1DTranspose2(input_tensor=x, filters=20, kernel_size=16, activation='elu', strides=2, padding='same')
+    x = BatchNormalization()(x)
+
+    x = Conv1DTranspose2(input_tensor=x, filters=40, kernel_size=16, activation='elu', strides=2, padding='same')
+    x = BatchNormalization()(x)
+
+    # **Fully Connected Layers (Latent Representation)**
+    x = Dense(signal_size, activation='elu')(x)  # 512차원으로 맞춤
+    x = BatchNormalization()(x)
+    x = Dropout(rate=0.5)(x)
+
+    # **출력 Shape 맞추기 (Conv1D로 조정)**
+    x = Conv1D(filters=1, kernel_size=1, activation='linear', padding='same')(x)  # 최종 출력 (batch_size, 512, 1)
+
+    model = Model(inputs=input_tensor, outputs=x)
+    return model
+
+
+
+
 
 def LANLFilter_module(x, layers):
     LB0 = Conv1D(filters=int(layers / 8),
@@ -864,7 +939,7 @@ class TFPositionalEncoding1D(tf.keras.layers.Layer):
 
         return self.cached_penc
         
-def Transformer_DAE(signal_size = sigLen,head_size=64,num_heads=2,ff_dim=64,num_transformer_blocks=4, dropout=0):   ###paper 1 model
+def Transformer_DAE(signal_size = sigLen,head_size=64,num_heads=2,ff_dim=64,num_transformer_blocks=2, dropout=0):   ###paper 1 model
 
     input_shape = (signal_size, 1)
     input = Input(shape=input_shape)

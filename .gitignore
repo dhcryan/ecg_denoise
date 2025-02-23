@@ -26,3 +26,4 @@ tes*
 *.tex
 *.json
 /cinc2017/*
+log/

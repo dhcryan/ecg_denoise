@@ -207,7 +207,7 @@ def test_dl(Dataset, experiment):
         model = CNN_DAE()
         model_label = 'CNN_DAE'
         
-    if experiment == 'FCN-DAE':
+    if experiment == 'FCN_DAE':
         # FCN_DAE
         model = FCN_DAE()
         model_label = 'FCN_DAE'
@@ -243,7 +243,7 @@ def test_dl(Dataset, experiment):
     if experiment == 'DRNN':
         criterion = 'mse'
 
-    elif experiment == 'FCN-DAE':
+    elif experiment == 'FCN_DAE':
         criterion = ssd_loss
 
     else:

@@ -37,7 +37,7 @@ def train_dl(Dataset, experiment):
 
     print('Deep Learning pipeline: Training the model for exp ' + str(experiment))
     
-    if experiment in ['Transformer_COMBDAE']:
+    if experiment in ['Dual_FreqDAE']:
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
 
         X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.3, shuffle=True, random_state=1)
@@ -80,9 +80,9 @@ def train_dl(Dataset, experiment):
         model = Transformer_DAE()
         model_label = 'Transformer_DAE'
         
-    if experiment == 'Transformer_COMBDAE':
-        model = Transformer_COMBDAE()
-        model_label = 'Transformer_COMBDAE'
+    if experiment == 'Dual_FreqDAE':
+        model = Dual_FreqDAE()
+        model_label = 'Dual_FreqDAE'
         
     print('\n ' + model_label + '\n ')
 
@@ -162,7 +162,7 @@ def train_dl(Dataset, experiment):
     # To run the tensor board
     # tensorboard --logdir=./runs_new
 
-    if experiment in ['Transformer_COMBDAE']:
+    if experiment in ['Dual_FreqDAE']:
         model.fit(x=[X_train, F_train_x], y=y_train,
                 validation_data=([X_val, F_val_x], y_val),
                 batch_size=batch_size,
@@ -191,7 +191,7 @@ def test_dl(Dataset, experiment):
 
     print('Deep Learning pipeline: Testing the model')
 # 여기선 x_test, y_test만 사용됨
-    if experiment in ['Transformer_COMBDAE']:
+    if experiment in ['Dual_FreqDAE']:
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
 
     else:
@@ -231,9 +231,9 @@ def test_dl(Dataset, experiment):
         model = Transformer_DAE()
         model_label = 'Transformer_DAE'
         
-    if experiment == 'Transformer_COMBDAE':
-        model = Transformer_COMBDAE()
-        model_label = 'Transformer_COMBDAE'
+    if experiment == 'Dual_FreqDAE':
+        model = Dual_FreqDAE()
+        model_label = 'Dual_FreqDAE'
             
     print('\n ' + model_label + '\n ')
 
@@ -270,7 +270,7 @@ def test_dl(Dataset, experiment):
     # load weights
     model.load_weights(model_filepath)
     
-    if experiment in ['Transformer_COMBDAE']:
+    if experiment in ['Dual_FreqDAE']:
         # Test score
         y_pred = model.predict([X_test, F_test_x], batch_size=batch_size, verbose=1)
 

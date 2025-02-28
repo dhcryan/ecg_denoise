@@ -27,3 +27,4 @@ tes*
 *.json
 /cinc2017/*
 log/
+*.csv

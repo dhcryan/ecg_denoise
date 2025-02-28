@@ -181,7 +181,7 @@ def Data_Preparation_with_Fourier(samples, fs=360):
         combined_noise = pickle.load(input)
     # with open('data/CombinedNoise_Test.pkl', 'rb') as input:
     #     static_noise = pickle.load(input)
-    with open('data/Mixed_Noise_SNR_3.pkl', 'rb') as input:
+    with open('data/Mixed_Noise_SNR_-3.pkl', 'rb') as input:
         static_noise = pickle.load(input)
     print(f"[INFO] Loaded CombinedNoise with {len(combined_noise)} channels")
     total_length = combined_noise.shape[0]  # 650000 samples

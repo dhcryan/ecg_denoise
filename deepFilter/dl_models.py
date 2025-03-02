@@ -1118,7 +1118,7 @@ def frequency_branch(input_tensor, filters, kernel_size=13):
 #     return xmul2
 
 
-def Dual_FreqDAE(signal_size = sigLen,head_size=64,num_heads=32,ff_dim=64,num_transformer_blocks=32, dropout=0):   ###paper 1 model
+def Dual_FreqDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_transformer_blocks=8, dropout=0):   ###paper 1 model
     input_shape = (signal_size, 1)
     time_input = Input(shape=input_shape)
     

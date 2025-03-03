@@ -55,15 +55,8 @@ if __name__ == "__main__":
             pickle.dump(test_results, output)
         print('Results from experiment ' + experiment + ' saved')
 
-        # 추가 시각화 (특정 실험에만 해당)
-        if experiment in ['Dual_FreqDAE']:
-            # visualize_multiple_beats(X_train, y_train, noise_indices_train, num_samples=5)
-            visualize_signals(y_train, X_train, fs=360, num_samples=5, signal_length=512, save_dir='visualizations/plot_signals')
-            plot_ecg_comparison_separate(X_train, y_train, valid_train_indices, "Training Set", num_beats=5, save_dir='visualizations')
-            plot_ecg_comparison_separate(X_test, y_test, valid_test_indices, "Testing Set", num_beats=5, save_dir='visualizations')
-
-        # 타이밍 저장
-        timing = [train_time_list, test_time_list]
-        with open(os.path.join(save_dir, 'timing_' + experiment + '.pkl'), 'wb') as output:
-            pickle.dump(timing, output)
-        print('Timing from experiment ' + experiment + ' saved')    
+        # # 타이밍 저장
+        # timing = [train_time_list, test_time_list]
+        # with open(os.path.join(save_dir, 'timing_' + experiment + '.pkl'), 'wb') as output:
+        #     pickle.dump(timing, output)
+        # print('Timing from experiment ' + experiment + ' saved')    

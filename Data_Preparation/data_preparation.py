@@ -8,9 +8,19 @@ import numpy as np
 import pickle
 import wfdb
 
-def Data_Preparation(samples):
+# def Data_Preparation(samples):
+#     with open('data/CombinedNoise_Test.pkl', 'rb') as input:
+#         static_noise = pickle.load(input)
+#     # with open('data/Mixed_Noise_SNR_-3.pkl', 'rb') as input:
+#     #     static_noise = pickle.load(input)
+#     test_noise_1 = static_noise
+#     # test_noise_1 = np.squeeze(static_noise)[0]
+def Data_Preparation(samples, noise_index=0):
     print('Getting the Data ready ...')
     # Set random seed for reproducibility
+    with open('data/CombinedNoise_Test_125.pkl', 'rb') as input:
+        all_test_noises = pickle.load(input)  # (125, 650000)
+    test_noise_1 = all_test_noises[noise_index]  # 현재 실험할 test_noise 선택
     seed = 1234
     np.random.seed(seed=seed)
     # Load QT Database
@@ -21,17 +31,14 @@ def Data_Preparation(samples):
     # 650000 samples
     with open('data/CombinedNoise_Train.pkl', 'rb') as input:
         combined_noise = pickle.load(input)
-    with open('data/CombinedNoise_Test.pkl', 'rb') as input:
-        static_noise = pickle.load(input)
-    # with open('data/Mixed_Noise_SNR_-3.pkl', 'rb') as input:
-    #     static_noise = pickle.load(input)
+
+
     print(f"[INFO] Loaded CombinedNoise with {len(combined_noise)} channels")
     total_length = combined_noise.shape[0]  # 650000 samples
     half_length = total_length // 2
     train_noise_1 = combined_noise
     # Test Noise:
-    test_noise_1 = static_noise
-    # test_noise_1 = np.squeeze(static_noise)[0]
+
     #####################################
     # Data split
     #####################################

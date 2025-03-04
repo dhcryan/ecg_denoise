@@ -42,99 +42,6 @@ def make_fourier_ifft(inputs, n, fs):
 
     return np.asarray(signal_list)
 
-
-# from scipy.fft import fft, ifft
-
-# def make_fourier(inputs, n, fs):
-#     """
-#     특정 주파수 대역만 유지하는 FFT 변환.
-    
-#     Parameters:
-#     inputs: 원본 신호 (2D 배열 - (배치 크기, 샘플 수))
-#     n: FFT 샘플 수
-#     fs: 샘플링 주파수 (예: 360 Hz)
-#     low_cut: 유지할 주파수 대역의 하한 (Hz)
-#     high_cut: 유지할 주파수 대역의 상한 (Hz)
-    
-#     Returns:
-#     특정 주파수 대역만 유지한 신호 (IFFT 후 time-domain으로 변환)
-#     """
-#     print(f"Input shape: {inputs.shape}")
-    
-#     T = n / fs
-#     k = np.arange(n)
-#     freq = k / T
-#     freq = freq[range(int(n / 2))]  # Nyquist 주파수까지 선택
-#     print(f"Freq shape: {freq.shape}")
-    
-#     signal_list = []
-#     for i in range(inputs.shape[0]):
-#         y = inputs[i, :]
-#         # print(f"Signal {i} shape: {y.shape}")
-#         # Signal 0 shape: (512,)
-#         Y = fft(y) / n  # FFT 수행 후 정규화
-#         # print(f"FFT output shape: {Y.shape}")
-#         # FFT output shape: (512,)
-#         # 특정 주파수 대역 필터링
-#         Y_filtered = np.zeros_like(Y)
-#         mask = (freq >= 0.5) & (freq <= 50)
-#         # print(f"Mask shape: {mask.shape}")
-#         # Mask shape: (256,)
-#         Y_filtered[:len(mask)][mask] = Y[:len(mask)][mask]  # 특정 대역만 유지
-# #         print(f"Filtered FFT shape: {Y_filtered.shape}")
-# # Filtered FFT shape: (512,)
-#         # IFFT로 복원
-#         # Y_ifft = ifft(Y_filtered)  
-#         # ifft_transformed = np.real(Y_ifft)
-#         # print(f"IFFT output shape: {ifft_transformed.shape}")
-#         # IFFT output shape: (512,)
-#         # IFFT output shape: (512,)
-#         signal_list.append(Y_filtered)
-
-#     output = np.asarray(signal_list)
-#     # print(f"Final output shape: {output.shape}")
-#     # Final output shape: (1, 512)
-
-#     return output
-
-# import numpy as np
-# from scipy.fft import fft
-
-# def make_fourier(inputs, n, fs):
-#     """
-#     주파수 대역별 가중치를 적용한 Fourier 변환.
-#     inputs: 입력 신호 (2D 배열 - (배치 크기, 샘플 수))
-#     n: FFT 샘플 수
-#     fs: 샘플링 주파수 (예: 360 Hz)
-#     """
-#     T = n / fs
-#     k = np.arange(n)
-#     freq = k / T  # 주파수 배열 (0 ~ fs/2)
-#     freq = freq[range(int(n / 2))]  # Nyquist 주파수까지 선택 (0 ~ 180 Hz)
-
-#     # 주파수 대역별 가중치 정의 (이미지 및 코드 참고)
-#     weights = np.ones_like(freq)  # 기본 가중치 1
-#     # 신호가 강한 저주파수 대역(0~20 Hz) 강조 (가중치 1.5)
-#     weights[(freq >= 0) & (freq <= 20)] = 1.5
-#     # 전력선 노이즈(50~60 Hz) 억제 (가중치 0.1)
-#     weights[(freq >= 50) & (freq <= 60)] = 0.1
-#     # 불필요한 고주파수(80~180 Hz) 억제 (가중치 0.05)
-#     weights[(freq >= 80) & (freq <= 180)] = 0.05
-
-#     signal_list = []
-#     for i in range(inputs.shape[0]):
-#         y = inputs[i, :]
-#         Y = fft(y) / n  # FFT 수행 후 정규화
-#         Y_mag = np.abs(Y[range(int(n / 2))]) * weights  # 주파수 대역별 가중치 적용
-#         Y_full = np.hstack([Y_mag, Y_mag])  # 시간 도메인 크기(512)로 확장
-#         signal_list.append(Y_full)
-
-#     return np.asarray(signal_list)
-
-# 사용 예시
-# X_test = np.random.randn(13316, 512, 1)  # 예시 데이터
-# F_test_x_weighted = make_fourier_weighted(X_test.squeeze(-1), 512, 360)
-# print("Weighted Fourier shape:", F_test_x_weighted.shape)  # (13316, 512)
 def make_fourier(inputs, n, fs):
     """
     주파수 도메인 정보 추출 및 time-domain과 같은 shape으로 만듦.
@@ -163,13 +70,21 @@ def make_fourier(inputs, n, fs):
 
     return np.asarray(signal_list)
 
-def Data_Preparation_with_Fourier(samples, fs=360):
+# def Data_Preparation_with_Fourier(samples, fs=360):
+#     print('Getting the Data ready ...')
+#     with open('data/CombinedNoise_Test.pkl', 'rb') as input:
+#         static_noise = pickle.load(input)
+#     test_noise_1 = static_noise
+def Data_Preparation_with_Fourier(samples, fs=360, noise_index=0):
     print('Getting the Data ready ...')
-
-    # Set random seed for reproducibility
+    # ✅ Test Noise를 125개 중에서 선택하여 로드
+    with open('data/CombinedNoise_Test_125.pkl', 'rb') as input:
+        all_test_noises = pickle.load(input)  # (125, 650000)
+    test_noise_1 = all_test_noises[noise_index]  # 현재 실험할 test_noise 선택
+    #---------------------여기까지 수정(위)---------------------
+    print(f"[INFO] Using Test Noise {noise_index + 1}/125")
     seed = 1234
     np.random.seed(seed=seed)
-
     # Load QT Database
     with open('data/QTDatabase.pkl', 'rb') as input:
         qtdb = pickle.load(input)
@@ -179,8 +94,7 @@ def Data_Preparation_with_Fourier(samples, fs=360):
     # 650000 samples
     with open('data/CombinedNoise_Train.pkl', 'rb') as input:
         combined_noise = pickle.load(input)
-    with open('data/CombinedNoise_Test.pkl', 'rb') as input:
-        static_noise = pickle.load(input)
+
     # with open('data/Mixed_Noise_SNR_-3.pkl', 'rb') as input:
     #     static_noise = pickle.load(input)
     print(f"[INFO] Loaded CombinedNoise with {len(combined_noise)} channels")
@@ -188,7 +102,7 @@ def Data_Preparation_with_Fourier(samples, fs=360):
     half_length = total_length // 2
     train_noise_1 = combined_noise
     # Test Noise:
-    test_noise_1 = static_noise
+
     # test_noise_1 = np.squeeze(static_noise)[0]
 
     test_set = ['sel123', 'sel233', 'sel302', 'sel307', 'sel820', 'sel853', 

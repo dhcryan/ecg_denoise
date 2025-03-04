@@ -253,15 +253,7 @@ def test_dl(Dataset, experiment):
     model.compile(loss=criterion,
                   optimizer=tf.keras.optimizers.Adam(learning_rate=0.01),
                   metrics=[losses.mean_squared_error, losses.mean_absolute_error, ssd_loss, mad_loss])
-    # # SHAP 분석기 정의
-    # explainer = shap.Explainer(model, [X_test, F_test_x])  # Time Domain과 Frequency Domain 둘 다 포함
-    # shap_values = explainer([X_test, F_test_x])  # SHAP 값 계산
-
-    # # SHAP 값 시각화
-    # shap.summary_plot(shap_values[0], X_test, feature_names=["Time Features"])  # Time Domain 기여도
-    # shap.summary_plot(shap_values[1], F_test_x, feature_names=["Frequency Features"])  # Frequency Domain 기여도
-    # 체크포인트 파일 경로 설정
-    model_dir = current_date
+    model_dir = 'best'
     model_filepath = os.path.join(model_dir, model_label + '_weights.best.weights.h5')
 
     # 디렉토리가 존재하지 않으면 생성

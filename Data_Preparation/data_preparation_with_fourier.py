@@ -70,17 +70,17 @@ def make_fourier(inputs, n, fs):
 
     return np.asarray(signal_list)
 
-# def Data_Preparation_with_Fourier(samples, fs=360):
-#     print('Getting the Data ready ...')
-#     with open('data/CombinedNoise_Test.pkl', 'rb') as input:
-#         static_noise = pickle.load(input)
-#     test_noise_1 = static_noise
-def Data_Preparation_with_Fourier(samples, fs=360, noise_index=0):
+def Data_Preparation_with_Fourier(samples, fs=360):
     print('Getting the Data ready ...')
-    # ✅ Test Noise를 125개 중에서 선택하여 로드
-    with open('data/CombinedNoise_Test_125.pkl', 'rb') as input:
-        all_test_noises = pickle.load(input)  # (125, 650000)
-    test_noise_1 = all_test_noises[noise_index]  # 현재 실험할 test_noise 선택
+    with open('data/CombinedNoise_Test.pkl', 'rb') as input:
+        static_noise = pickle.load(input)
+    test_noise_1 = static_noise
+# def Data_Preparation_with_Fourier(samples, fs=360, noise_index=0):
+#     print('Getting the Data ready ...')
+#     # ✅ Test Noise를 125개 중에서 선택하여 로드
+#     with open('data/CombinedNoise_Test_125.pkl', 'rb') as input:
+#         all_test_noises = pickle.load(input)  # (125, 650000)
+#     test_noise_1 = all_test_noises[noise_index]  # 현재 실험할 test_noise 선택
     #---------------------여기까지 수정(위)---------------------
     print(f"[INFO] Using Test Noise {noise_index + 1}/125")
     seed = 1234

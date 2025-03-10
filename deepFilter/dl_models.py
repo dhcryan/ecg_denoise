@@ -1054,36 +1054,124 @@ def Transformer_DAE(signal_size = sigLen,head_size=64,num_heads=2,ff_dim=64,num_
 
 ks = 13   #orig 13
 ks1 = 7
-
 def frequency_branch(input_tensor, filters, kernel_size=13):
-    # 첫 번째 Conv1D 및 Gated Noise 추가
-    x0 = Conv1D(filters=filters, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(input_tensor)
-    # x0 = AddGatedNoise()(x0)
+    # 첫 번째 FAN Layer + Conv1D(stride=2) 추가
+    x0 = FANLayer(output_dim=filters, p_ratio=0.25, activation="gelu", gated=True)(input_tensor)
     x0 = Activation('sigmoid')(x0)
+    x0 = Conv1D(filters=filters, kernel_size=1, strides=2, padding='same')(x0)  # Stride 적용
 
-    x0_ = Conv1D(filters=filters, kernel_size=kernel_size, activation=None, strides=2, padding='same')(input_tensor)
+    x0_ = FANLayer(output_dim=filters, p_ratio=0.25, activation=None, gated=True)(input_tensor)
+    x0_ = Conv1D(filters=filters, kernel_size=1, strides=2, padding='same')(x0_)  # Stride 적용
     xmul0 = Multiply()([x0, x0_])
     xmul0 = BatchNormalization()(xmul0)
 
-    # 두 번째 Conv1D 및 Gated Noise 추가
-    x1 = Conv1D(filters=filters * 2, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(xmul0)
-    # x1 = AddGatedNoise()(x1)
+    # 두 번째 FAN Layer + Conv1D(stride=2) 추가
+    x1 = FANLayer(output_dim=filters * 2, p_ratio=0.25, activation="gelu", gated=True)(xmul0)
     x1 = Activation('sigmoid')(x1)
+    x1 = Conv1D(filters=filters * 2, kernel_size=1, strides=2, padding='same')(x1)  # Stride 적용
 
-    x1_ = Conv1D(filters=filters * 2, kernel_size=kernel_size, activation=None, strides=2, padding='same')(xmul0)
+    x1_ = FANLayer(output_dim=filters * 2, p_ratio=0.25, activation=None, gated=True)(xmul0)
+    x1_ = Conv1D(filters=filters * 2, kernel_size=1, strides=2, padding='same')(x1_)
     xmul1 = Multiply()([x1, x1_])
     xmul1 = BatchNormalization()(xmul1)
 
-    # 세 번째 Conv1D 및 Gated Noise 추가
-    x2 = Conv1D(filters=filters * 4, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(xmul1)
-    # x2 = AddGatedNoise()(x2)
+    # 세 번째 FAN Layer + Conv1D(stride=2) 추가
+    x2 = FANLayer(output_dim=filters * 4, p_ratio=0.25, activation="gelu", gated=True)(xmul1)
     x2 = Activation('sigmoid')(x2)
+    x2 = Conv1D(filters=filters * 4, kernel_size=1, strides=2, padding='same')(x2)  # Stride 적용
 
-    x2_ = Conv1D(filters=filters * 4, kernel_size=kernel_size, activation='elu', strides=2, padding='same')(xmul1)
+    x2_ = FANLayer(output_dim=filters * 4, p_ratio=0.25, activation='elu', gated=True)(xmul1)
+    x2_ = Conv1D(filters=filters * 4, kernel_size=1, strides=2, padding='same')(x2_)
     xmul2 = Multiply()([x2, x2_])
     xmul2 = BatchNormalization()(xmul2)
 
     return xmul2
+
+
+def Dual_FreqDAE(signal_size = sigLen, head_size=64, num_heads=8, ff_dim=64, num_transformer_blocks=8, dropout=0):
+    input_shape = (signal_size, 1)
+    time_input = Input(shape=input_shape)
+    freq_input = Input(shape=input_shape)
+
+    # 시간 도메인 인코더
+    x0 = Conv1D(16, ks, activation='sigmoid', strides=2, padding='same')(time_input)
+    x0_ = Conv1D(16, ks, activation=None, strides=2, padding='same')(time_input)
+    xmul0 = Multiply()([x0, x0_])
+    xmul0 = BatchNormalization()(xmul0)
+
+    x1 = Conv1D(32, ks, activation='sigmoid', strides=2, padding='same')(xmul0)
+    x1_ = Conv1D(32, ks, activation=None, strides=2, padding='same')(xmul0)
+    xmul1 = Multiply()([x1, x1_])
+    xmul1 = BatchNormalization()(xmul1)
+
+    x2 = Conv1D(64, ks, activation='sigmoid', strides=2, padding='same')(xmul1)
+    x2_ = Conv1D(64, ks, activation='elu', strides=2, padding='same')(xmul1)
+    xmul2 = Multiply()([x2, x2_])
+    xmul2 = BatchNormalization()(xmul2)
+
+    # 주파수 도메인 인코더 (FAN 기반으로 수정)
+    f2 = frequency_branch(freq_input, 16, 13)
+
+    # Cross Attention: 시간→주파수
+    cross_out = layers.MultiHeadAttention(num_heads=num_heads, key_dim=head_size)(xmul2, f2)
+    combined = layers.Concatenate()([xmul2, cross_out])
+
+    # Position Encoding + Transformer Encoder
+    position_embed = TFPositionalEncoding1D(signal_size)
+    x3 = combined + position_embed(combined)
+
+    for _ in range(num_transformer_blocks):
+        x3 = FANformer_encoder(x3, head_size, num_heads, ff_dim, dropout)
+
+    # 디코더
+    x4 = x3
+    x5 = Conv1DTranspose(x4, filters=64, kernel_size=ks, activation='elu', strides=1, padding='same')
+    x5 = Add()([x5, xmul2])
+    x5 = BatchNormalization()(x5)
+
+    x6 = Conv1DTranspose(x5, filters=32, kernel_size=ks, activation='elu', strides=2, padding='same')
+    x6 = Add()([x6, xmul1])
+    x6 = BatchNormalization()(x6)
+
+    x7 = Conv1DTranspose(x6, filters=16, kernel_size=ks, activation='elu', strides=2, padding='same')
+    x7 = Add()([x7, xmul0])
+    x8 = BatchNormalization()(x7)
+
+    predictions = Conv1DTranspose(x8, filters=1, kernel_size=ks, activation='linear', strides=2, padding='same')
+
+    model = Model(inputs=[time_input, freq_input], outputs=predictions)
+    return model
+
+# this is real one
+# def frequency_branch(input_tensor, filters, kernel_size=13):
+#     # 첫 번째 Conv1D 및 Gated Noise 추가
+#     x0 = Conv1D(filters=filters, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(input_tensor)
+#     # x0 = AddGatedNoise()(x0)
+#     x0 = Activation('sigmoid')(x0)
+
+#     x0_ = Conv1D(filters=filters, kernel_size=kernel_size, activation=None, strides=2, padding='same')(input_tensor)
+#     xmul0 = Multiply()([x0, x0_])
+#     xmul0 = BatchNormalization()(xmul0)
+
+#     # 두 번째 Conv1D 및 Gated Noise 추가
+#     x1 = Conv1D(filters=filters * 2, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(xmul0)
+#     # x1 = AddGatedNoise()(x1)
+#     x1 = Activation('sigmoid')(x1)
+
+#     x1_ = Conv1D(filters=filters * 2, kernel_size=kernel_size, activation=None, strides=2, padding='same')(xmul0)
+#     xmul1 = Multiply()([x1, x1_])
+#     xmul1 = BatchNormalization()(xmul1)
+
+#     # 세 번째 Conv1D 및 Gated Noise 추가
+#     x2 = Conv1D(filters=filters * 4, kernel_size=kernel_size, activation='linear', strides=2, padding='same')(xmul1)
+#     # x2 = AddGatedNoise()(x2)
+#     x2 = Activation('sigmoid')(x2)
+
+#     x2_ = Conv1D(filters=filters * 4, kernel_size=kernel_size, activation='elu', strides=2, padding='same')(xmul1)
+#     xmul2 = Multiply()([x2, x2_])
+#     xmul2 = BatchNormalization()(xmul2)
+
+#     return xmul2
 # def frequency_branch(input_tensor, filters, kernel_size=13):
 #     # 첫 번째 FAN Layer + Conv1D(stride=2) 추가
 #     x0 = FANLayer(output_dim=filters, p_ratio=0.25, activation="gelu", gated=True)(input_tensor)
@@ -1118,119 +1206,119 @@ def frequency_branch(input_tensor, filters, kernel_size=13):
 #     return xmul2
 
 
-def Dual_FreqDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_transformer_blocks=8, dropout=0):   ###paper 1 model
-    input_shape = (signal_size, 1)
-    time_input = Input(shape=input_shape)
+# def Dual_FreqDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_transformer_blocks=8, dropout=0):   ###paper 1 model
+#     input_shape = (signal_size, 1)
+#     time_input = Input(shape=input_shape)
     
-    # 주파수 도메인 입력
-    freq_input = Input(shape=input_shape)
+#     # 주파수 도메인 입력
+#     freq_input = Input(shape=input_shape)
 
-    x0 = Conv1D(filters=16,
-                input_shape=(input_shape, 1),
-                kernel_size=ks,
-                activation='linear', 
-                strides=2,
-                padding='same')(time_input)
+#     x0 = Conv1D(filters=16,
+#                 input_shape=(input_shape, 1),
+#                 kernel_size=ks,
+#                 activation='linear', 
+#                 strides=2,
+#                 padding='same')(time_input)
 
-    x0 = layers.Activation('sigmoid')(x0)
-    # x0 = Dropout(0.3)(x0)
-    x0_ = Conv1D(filters=16,
-               input_shape=(input_shape, 1),
-               kernel_size=ks,
-               activation=None,
-               strides=2,
-               padding='same')(time_input)
-    # x0_ = Dropout(0.3)(x0_)
-    xmul0 = Multiply()([x0,x0_])
+#     x0 = layers.Activation('sigmoid')(x0)
+#     # x0 = Dropout(0.3)(x0)
+#     x0_ = Conv1D(filters=16,
+#                input_shape=(input_shape, 1),
+#                kernel_size=ks,
+#                activation=None,
+#                strides=2,
+#                padding='same')(time_input)
+#     # x0_ = Dropout(0.3)(x0_)
+#     xmul0 = Multiply()([x0,x0_])
 
-    xmul0 = BatchNormalization()(xmul0)
+#     xmul0 = BatchNormalization()(xmul0)
 
-    x1 = Conv1D(filters=32,
-                kernel_size=ks,
-                activation='linear',
-                strides=2,
-                padding='same')(xmul0)
+#     x1 = Conv1D(filters=32,
+#                 kernel_size=ks,
+#                 activation='linear',
+#                 strides=2,
+#                 padding='same')(xmul0)
 
-    x1 = layers.Activation('sigmoid')(x1)
+#     x1 = layers.Activation('sigmoid')(x1)
 
-    # x1 = Dropout(0.3)(x1)
-    x1_ = Conv1D(filters=32,
-               kernel_size=ks,
-               activation=None,
-               strides=2,
-               padding='same')(xmul0)
-    # x1_ = Dropout(0.3)(x1_)
-    xmul1 = Multiply()([x1, x1_])
-    xmul1 = BatchNormalization()(xmul1)
+#     # x1 = Dropout(0.3)(x1)
+#     x1_ = Conv1D(filters=32,
+#                kernel_size=ks,
+#                activation=None,
+#                strides=2,
+#                padding='same')(xmul0)
+#     # x1_ = Dropout(0.3)(x1_)
+#     xmul1 = Multiply()([x1, x1_])
+#     xmul1 = BatchNormalization()(xmul1)
 
-    x2 = Conv1D(filters=64,
-               kernel_size=ks,
-               activation='linear',
-               strides=2,
-               padding='same')(xmul1)
+#     x2 = Conv1D(filters=64,
+#                kernel_size=ks,
+#                activation='linear',
+#                strides=2,
+#                padding='same')(xmul1)
 
-    x2 = layers.Activation('sigmoid')(x2)
-    # x2 = Dropout(0.3)(x2)
-    x2_ = Conv1D(filters=64,
-               kernel_size=ks,
-               activation='elu',
-               strides=2,
-               padding='same')(xmul1)
-    # x2_ = Dropout(0.3)(x2_)
-    xmul2 = Multiply()([x2, x2_])
+#     x2 = layers.Activation('sigmoid')(x2)
+#     # x2 = Dropout(0.3)(x2)
+#     x2_ = Conv1D(filters=64,
+#                kernel_size=ks,
+#                activation='elu',
+#                strides=2,
+#                padding='same')(xmul1)
+#     # x2_ = Dropout(0.3)(x2_)
+#     xmul2 = Multiply()([x2, x2_])
 
-    xmul2 = BatchNormalization()(xmul2)
+#     xmul2 = BatchNormalization()(xmul2)
     
-    f2 = frequency_branch(freq_input, 16, 13)
+#     f2 = frequency_branch(freq_input, 16, 13)
 
-    # 시간 및 주파수 도메인 특성 결합
-    combined = layers.Concatenate()([xmul2, f2])    
-    position_embed = TFPositionalEncoding1D(signal_size)
-    x3 = combined+position_embed(combined)
-    #
-    for _ in range(num_transformer_blocks):
-        x3 = FANformer_encoder(x3,head_size,num_heads,ff_dim, dropout)
+#     # 시간 및 주파수 도메인 특성 결합
+#     combined = layers.Concatenate()([xmul2, f2])    
+#     position_embed = TFPositionalEncoding1D(signal_size)
+#     x3 = combined+position_embed(combined)
+#     #
+#     for _ in range(num_transformer_blocks):
+#         x3 = FANformer_encoder(x3,head_size,num_heads,ff_dim, dropout)
 
     
-    x4 = x3
-    x5 = Conv1DTranspose(input_tensor=x4,
-                        filters=64,
-                        kernel_size=ks,
-                        activation='elu',
-                        strides=1,
-                        padding='same')
-    x5 = x5+xmul2
-    x5 = BatchNormalization()(x5)
+#     x4 = x3
+#     x5 = Conv1DTranspose(input_tensor=x4,
+#                         filters=64,
+#                         kernel_size=ks,
+#                         activation='elu',
+#                         strides=1,
+#                         padding='same')
+#     x5 = x5+xmul2
+#     x5 = BatchNormalization()(x5)
 
-    x6 = Conv1DTranspose(input_tensor=x5,
-                        filters=32,
-                        kernel_size=ks,
-                        activation='elu',
-                        strides=2,
-                        padding='same')
-    x6 = x6+xmul1
-    x6 = BatchNormalization()(x6)
+#     x6 = Conv1DTranspose(input_tensor=x5,
+#                         filters=32,
+#                         kernel_size=ks,
+#                         activation='elu',
+#                         strides=2,
+#                         padding='same')
+#     x6 = x6+xmul1
+#     x6 = BatchNormalization()(x6)
 
-    x7 = Conv1DTranspose(input_tensor=x6,
-                        filters=16,
-                        kernel_size=ks,
-                        activation='elu',
-                        strides=2,
-                        padding='same')
+#     x7 = Conv1DTranspose(input_tensor=x6,
+#                         filters=16,
+#                         kernel_size=ks,
+#                         activation='elu',
+#                         strides=2,
+#                         padding='same')
 
-    x7 = x7 + xmul0 #res
+#     x7 = x7 + xmul0 #res
 
-    x8 = BatchNormalization()(x7)
-    predictions = Conv1DTranspose(
-                        input_tensor=x8,
-                        filters=1,
-                        kernel_size=ks,
-                        activation='linear',
-                        strides=2,
-                        padding='same')
+#     x8 = BatchNormalization()(x7)
+#     predictions = Conv1DTranspose(
+#                         input_tensor=x8,
+#                         filters=1,
+#                         kernel_size=ks,
+#                         activation='linear',
+#                         strides=2,
+#                         padding='same')
 
-    model = Model(inputs=[time_input, freq_input], outputs=predictions)
-    return model
+#     model = Model(inputs=[time_input, freq_input], outputs=predictions)
+#     return model
 
 
 # import tensorflow as tf

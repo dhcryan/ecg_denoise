@@ -253,13 +253,15 @@ def test_dl(Dataset, experiment):
     model.compile(loss=criterion,
                   optimizer=tf.keras.optimizers.Adam(learning_rate=0.01),
                   metrics=[losses.mean_squared_error, losses.mean_absolute_error, ssd_loss, mad_loss])
-    model_dir = 'best'
+    # # for 125
+    # model_dir = 'best'
+    model_dir = current_date
     model_filepath = os.path.join(model_dir, model_label + '_weights.best.weights.h5')
 
     # 디렉토리가 존재하지 않으면 생성
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
-    # load weights
+
     model.load_weights(model_filepath)
     
     if experiment in ['Dual_FreqDAE']:

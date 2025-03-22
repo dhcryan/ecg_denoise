@@ -864,7 +864,7 @@ def transformer_encoder(inputs,head_size,num_heads,ff_dim,dropout=0):
     # x = layers.Dropout(dropout)(x)
     # x = layers.Dense(inputs.shape[-1])(x)  # 최종 출력 크기 조정
     # return x + res  # Residual connection
-def FANformer_encoder(inputs,head_size,num_heads,ff_dim,dropout=0):
+def FANformer_encoder(inputs,head_size,num_heads,hidden_dim=2048, ff_dim=64,dropout=0):
     # Normalization and Attention
     x = layers.LayerNormalization(epsilon=1e-6)(inputs)
     x = layers.MultiHeadAttention(
@@ -873,9 +873,13 @@ def FANformer_encoder(inputs,head_size,num_heads,ff_dim,dropout=0):
     res = x + inputs
     # FAN Layer 적용 (Feed Forward 부분)
     x = layers.LayerNormalization(epsilon=1e-6)(res)
+    x = FANLayer(output_dim=hidden_dim, p_ratio=0.25, activation="gelu", gated=False)(x)
+    x = FANLayer(output_dim=hidden_dim, p_ratio=0.25, activation="gelu", gated=False)(x)
     x = FANLayer(output_dim=ff_dim, p_ratio=0.25, activation="gelu", gated=False)(x)
+
     x = layers.Dropout(dropout)(x)
     # x = layers.Dense(inputs.shape[-1])(x)  # 최종 출력 크기 조정
+    #    # x = layers.Conv1D(filters=inputs.shape[-1], kernel_size=1)(x) 밑에껀 이걸로 해도되긴함
     x = FANLayer(output_dim=inputs.shape[-1], p_ratio=0.25, activation="linear", gated=False)(x)
     # x = layers.LayerNormalization(epsilon=1e-6)(res)
     # x = layers.Conv1D(filters=ff_dim, kernel_size=1, activation="relu")(x) 
@@ -1255,7 +1259,7 @@ def frequency_branch(input_tensor, filters, kernel_size=13):
 
     return xmul2
 
-def Dual_FreqDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_transformer_blocks=8, dropout=0):   ###paper 1 model
+def Dual_FreqDAE(signal_size = sigLen,head_size=64,num_heads=8,hidden_dim=2048,ff_dim=64,num_transformer_blocks=8, dropout=0):   ###paper 1 model
     input_shape = (signal_size, 1)
     time_input = Input(shape=input_shape)
     
@@ -1329,7 +1333,7 @@ def Dual_FreqDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_tra
     x3 = combined+position_embed(combined)
     #
     for _ in range(num_transformer_blocks):
-        x3 = FANformer_encoder(x3,head_size,num_heads,ff_dim, dropout)
+        x3 = FANformer_encoder(x3,head_size,num_heads,hidden_dim,ff_dim, dropout)
     # for _ in range(num_transformer_blocks):
     #     xmul2 = FANformer_encoder(xmul2, head_size, num_heads, ff_dim, dropout)
     #     f2 = FANformer_encoder(f2, head_size, num_heads, ff_dim, dropout)

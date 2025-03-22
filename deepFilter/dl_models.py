@@ -864,36 +864,40 @@ def transformer_encoder(inputs,head_size,num_heads,ff_dim,dropout=0):
     # x = layers.Dropout(dropout)(x)
     # x = layers.Dense(inputs.shape[-1])(x)  # 최종 출력 크기 조정
     # return x + res  # Residual connection
-# def FANformer_encoder(inputs,head_size,num_heads,ff_dim,dropout=0):
-#     # Normalization and Attention
-#     x = layers.LayerNormalization(epsilon=1e-6)(inputs)
-#     x = layers.MultiHeadAttention(
-#         key_dim=head_size, num_heads=num_heads, dropout=dropout)(x, x)
-#     x = layers.Dropout(dropout)(x)
-#     res = x + inputs
-#     # FAN Layer 적용 (Feed Forward 부분)
-#     x = layers.LayerNormalization(epsilon=1e-6)(res)
-#     x = FANLayer(output_dim=ff_dim, p_ratio=0.25, activation="gelu", gated=False)(x)
-#     x = layers.Dropout(dropout)(x)
-#     # x = layers.Dense(inputs.shape[-1])(x)  # 최종 출력 크기 조정
-#     x = FANLayer(output_dim=inputs.shape[-1], p_ratio=0.25, activation="linear", gated=False)(x)
-#     return x + res  # Residual connection
-
-def FANformer_encoder(inputs, head_size, num_heads, ff_dim, dropout=0):
-    # DyT 대신 LayerNorm
-    x = DynamicTanh(normalized_shape=inputs.shape[-1])(inputs)
+def FANformer_encoder(inputs,head_size,num_heads,ff_dim,dropout=0):
+    # Normalization and Attention
+    x = layers.LayerNormalization(epsilon=1e-6)(inputs)
     x = layers.MultiHeadAttention(
         key_dim=head_size, num_heads=num_heads, dropout=dropout)(x, x)
     x = layers.Dropout(dropout)(x)
     res = x + inputs
-
-    # Feed-forward
-    x = DynamicTanh(normalized_shape=res.shape[-1])(res)
+    # FAN Layer 적용 (Feed Forward 부분)
+    x = layers.LayerNormalization(epsilon=1e-6)(res)
     x = FANLayer(output_dim=ff_dim, p_ratio=0.25, activation="gelu", gated=False)(x)
     x = layers.Dropout(dropout)(x)
+    # x = layers.Dense(inputs.shape[-1])(x)  # 최종 출력 크기 조정
     x = FANLayer(output_dim=inputs.shape[-1], p_ratio=0.25, activation="linear", gated=False)(x)
+    # x = layers.LayerNormalization(epsilon=1e-6)(res)
+    # x = layers.Conv1D(filters=ff_dim, kernel_size=1, activation="relu")(x) 
+    # x = layers.Dropout(dropout)(x)
+    # x = layers.Conv1D(filters=inputs.shape[-1], kernel_size=1)(x)
+    return x + res  # Residual connection
 
-    return x + res
+# def FANformer_encoder(inputs, head_size, num_heads, ff_dim, dropout=0):
+#     # DyT 대신 LayerNorm
+#     x = DynamicTanh(normalized_shape=inputs.shape[-1])(inputs)
+#     x = layers.MultiHeadAttention(
+#         key_dim=head_size, num_heads=num_heads, dropout=dropout)(x, x)
+#     x = layers.Dropout(dropout)(x)
+#     res = x + inputs
+
+#     # Feed-forward
+#     x = DynamicTanh(normalized_shape=res.shape[-1])(res)
+#     x = FANLayer(output_dim=ff_dim, p_ratio=0.25, activation="gelu", gated=False)(x)
+#     x = layers.Dropout(dropout)(x)
+#     x = FANLayer(output_dim=inputs.shape[-1], p_ratio=0.25, activation="linear", gated=False)(x)
+
+#     return x + res
 
 
 # def transformer_encoder(inputs, head_size, num_heads, ff_dim, dropout=0):
@@ -1000,7 +1004,7 @@ def Transformer_DAE(signal_size = sigLen,head_size=64,num_heads=2,ff_dim=64,num_
                 strides=2,
                 padding='same')(input)
 
-    x0 = AddGatedNoise()(x0)
+    # x0 = AddGatedNoise()(x0)
 
     x0 = layers.Activation('sigmoid')(x0)
     # x0 = Dropout(0.3)(x0)
@@ -1021,7 +1025,7 @@ def Transformer_DAE(signal_size = sigLen,head_size=64,num_heads=2,ff_dim=64,num_
                 strides=2,
                 padding='same')(xmul0)
 
-    x1 = AddGatedNoise()(x1)
+    # x1 = AddGatedNoise()(x1)
 
     x1 = layers.Activation('sigmoid')(x1)
 
@@ -1040,7 +1044,7 @@ def Transformer_DAE(signal_size = sigLen,head_size=64,num_heads=2,ff_dim=64,num_
                activation='linear',
                strides=2,
                padding='same')(xmul1)
-    x2 = AddGatedNoise()(x2)
+    # x2 = AddGatedNoise()(x2)
 
     x2 = layers.Activation('sigmoid')(x2)
     # x2 = Dropout(0.3)(x2)
@@ -1190,7 +1194,36 @@ ks1 = 7
 
 #     model = Model(inputs=[time_input, freq_input], outputs=predictions)
 #     return model
+# Parametric Noise Injection 레이어 정의
+class ParametricNoiseInjection(layers.Layer):
+    def __init__(self, noise_scale_init=0.1, **kwargs):
+        super(ParametricNoiseInjection, self).__init__(**kwargs)
+        self.noise_scale_init = noise_scale_init
 
+    def build(self, input_shape):
+        # 학습 가능한 노이즈 매개변수: 평균(mu)과 분산 로그(sigma_log)
+        self.mu = self.add_weight(name='mu', shape=(1,), initializer='zeros', trainable=True)
+        self.sigma_log = self.add_weight(name='sigma_log', shape=(1,), initializer=tf.keras.initializers.Constant(tf.math.log(self.noise_scale_init)), trainable=True)
+
+    def call(self, inputs, training=None):
+        if training is None:
+            training = False
+        
+        # 학습 중일 때만 노이즈 주입
+        def noisy_output():
+            sigma = tf.exp(self.sigma_log)  # 분산은 양수 보장을 위해 로그 스케일에서 변환
+            noise = tf.random.normal(shape=tf.shape(inputs), mean=self.mu, stddev=sigma)
+            return inputs + noise  # 노이즈를 더하는 방식 (곱셈 대신 덧셈 사용)
+        
+        def clean_output():
+            return inputs
+        
+        return tf.cond(tf.cast(training, tf.bool), noisy_output, clean_output)
+
+    def get_config(self):
+        config = super(ParametricNoiseInjection, self).get_config()
+        config.update({"noise_scale_init": self.noise_scale_init})
+        return config
 # this is real one
 def frequency_branch(input_tensor, filters, kernel_size=13):
     # 첫 번째 Conv1D 및 Gated Noise 추가
@@ -1235,7 +1268,7 @@ def Dual_FreqDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_tra
                 activation='linear', 
                 strides=2,
                 padding='same')(time_input)
-
+    x0 = AddGatedNoise()(x0)
     x0 = layers.Activation('sigmoid')(x0)
     # x0 = Dropout(0.3)(x0)
     x0_ = Conv1D(filters=16,
@@ -1254,7 +1287,8 @@ def Dual_FreqDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_tra
                 activation='linear',
                 strides=2,
                 padding='same')(xmul0)
-
+    x1 = AddGatedNoise()(x1)
+    # x1 = ParametricNoiseInjection(noise_scale_init=0.1)(x1)  # PNI로 대체
     x1 = layers.Activation('sigmoid')(x1)
 
     # x1 = Dropout(0.3)(x1)
@@ -1272,8 +1306,10 @@ def Dual_FreqDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_tra
                activation='linear',
                strides=2,
                padding='same')(xmul1)
-
+    x2 = AddGatedNoise()(x2)
+    # x2 = ParametricNoiseInjection(noise_scale_init=0.1)(x2)  # PNI로 대체
     x2 = layers.Activation('sigmoid')(x2)
+
     # x2 = Dropout(0.3)(x2)
     x2_ = Conv1D(filters=64,
                kernel_size=ks,
@@ -1340,6 +1376,91 @@ def Dual_FreqDAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_tra
 
     model = Model(inputs=[time_input, freq_input], outputs=predictions)
     return model
+
+# def Dual_Transformer_DAE(signal_size=sigLen, head_size=64, num_heads=16, ff_dim=64, num_transformer_blocks=4, dropout=0):
+#     input_shape = (signal_size, 1)
+#     time_input = Input(shape=input_shape)
+
+#     # Time-Domain Branch 1
+#     x0_1 = Conv1D(filters=16, kernel_size=ks, activation='linear', strides=2, padding='same')(time_input)
+#     x0_1 = Activation('sigmoid')(x0_1)
+#     x0_1_ = Conv1D(filters=16, kernel_size=ks, activation=None, strides=2, padding='same')(time_input)
+#     xmul0_1 = Multiply()([x0_1, x0_1_])
+
+#     x1_1 = Conv1D(filters=32, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul0_1)
+#     x1_1 = Activation('sigmoid')(x1_1)
+#     x1_1_ = Conv1D(filters=32, kernel_size=ks, activation=None, strides=2, padding='same')(xmul0_1)
+#     xmul1_1 = Multiply()([x1_1, x1_1_])
+
+#     x2_1 = Conv1D(filters=64, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul1_1)
+#     x2_1 = Activation('sigmoid')(x2_1)
+#     x2_1_ = Conv1D(filters=64, kernel_size=ks, activation='elu', strides=2, padding='same')(xmul1_1)
+#     xmul2_1 = Multiply()([x2_1, x2_1_])
+
+#     # Time-Domain Branch 2 (독립적인 feature extraction)
+#     x0_2 = Conv1D(filters=16, kernel_size=ks1, activation='linear', strides=2, padding='same')(time_input)
+#     x0_2 = Activation('sigmoid')(x0_2)
+#     x0_2_ = Conv1D(filters=16, kernel_size=ks1, activation=None, strides=2, padding='same')(time_input)
+#     xmul0_2 = Multiply()([x0_2, x0_2_])
+
+#     x1_2 = Conv1D(filters=32, kernel_size=ks1, activation='linear', strides=2, padding='same')(xmul0_2)
+#     x1_2 = Activation('sigmoid')(x1_2)
+#     x1_2_ = Conv1D(filters=32, kernel_size=ks1, activation=None, strides=2, padding='same')(xmul0_2)
+#     xmul1_2 = Multiply()([x1_2, x1_2_])
+
+#     x2_2 = Conv1D(filters=64, kernel_size=ks1, activation='linear', strides=2, padding='same')(xmul1_2)
+#     x2_2 = Activation('sigmoid')(x2_2)
+#     x2_2_ = Conv1D(filters=64, kernel_size=ks1, activation='elu', strides=2, padding='same')(xmul1_2)
+#     xmul2_2 = Multiply()([x2_2, x2_2_])
+
+#     # 두 branch 병합
+#     combined = layers.Concatenate()([xmul2_1, xmul2_2])
+    
+#     # Transformer Encoder 적용
+#     position_embed = TFPositionalEncoding1D(signal_size)
+#     x3 = combined + position_embed(combined)
+    
+#     for _ in range(num_transformer_blocks):
+#         x3 = transformer_encoder(x3, head_size, num_heads, ff_dim, dropout)
+
+#     x4 = x3
+#     x5 = Conv1DTranspose(input_tensor=x4,
+#                         filters=64,
+#                         kernel_size=ks,
+#                         activation='elu',
+#                         strides=1,
+#                         padding='same')
+#     x5 = BatchNormalization()(x5)
+
+#     x6 = Conv1DTranspose(input_tensor=x5,
+#                         filters=32,
+#                         kernel_size=ks,
+#                         activation='elu',
+#                         strides=2,
+#                         padding='same')
+#     x6 = BatchNormalization()(x6)
+
+#     x7 = Conv1DTranspose(input_tensor=x6,
+#                         filters=16,
+#                         kernel_size=ks,
+#                         activation='elu',
+#                         strides=2,
+#                         padding='same')
+
+
+#     x8 = BatchNormalization()(x7)
+#     predictions = Conv1DTranspose(
+#                         input_tensor=x8,
+#                         filters=1,
+#                         kernel_size=ks,
+#                         activation='linear',
+#                         strides=2,
+#                         padding='same')
+
+#     model = Model(inputs=[time_input], outputs=predictions)
+#     return model
+
+
 
 
 # import tensorflow as tf

@@ -16,7 +16,7 @@ from deepFilter.dl_pipeline import train_dl, test_dl
 
 if __name__ == "__main__":
 
-    # dl_experiments = [ 'DRNN', 'DeepFilter','CNN_DAE','FCN_DAE','AttentionSkipDAE','Transformer_DAE']
+    # dl_experiments = [ 'DRNN', 'DeepFilter','CNN_DAE','FCN_DAE','AttentionSkipDAE','Transformer_DAE','Dual_FreqDAE']
     dl_experiments = ['Dual_FreqDAE']
     train_time_list = []
     test_time_list = []

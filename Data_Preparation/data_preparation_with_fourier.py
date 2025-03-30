@@ -75,6 +75,7 @@ def Data_Preparation_with_Fourier(samples, fs=360):
     with open('data/CombinedNoise_Test.pkl', 'rb') as input:
         static_noise = pickle.load(input)
     test_noise_1 = static_noise
+#---------------------여기까지 수정(위)---------------------
 # def Data_Preparation_with_Fourier(samples, fs=360, noise_index=0):
 #     print('Getting the Data ready ...')
 #     # ✅ Test Noise를 125개 중에서 선택하여 로드
@@ -82,8 +83,6 @@ def Data_Preparation_with_Fourier(samples, fs=360):
 #         all_test_noises = pickle.load(input)  # (125, 650000)
 #     test_noise_1 = all_test_noises[noise_index]  # 현재 실험할 test_noise 선택
     # print(f"[INFO] Using Test Noise {noise_index + 1}/125")
-    #---------------------여기까지 수정(위)---------------------
-
     seed = 1234
     np.random.seed(seed=seed)
     # Load QT Database
@@ -98,13 +97,14 @@ def Data_Preparation_with_Fourier(samples, fs=360):
 
     # with open('data/Mixed_Noise_SNR_-3.pkl', 'rb') as input:
     #     static_noise = pickle.load(input)
+    # test_noise_1 = np.squeeze(static_noise)[0]
     print(f"[INFO] Loaded CombinedNoise with {len(combined_noise)} channels")
     total_length = combined_noise.shape[0]  # 650000 samples
     half_length = total_length // 2
     train_noise_1 = combined_noise
     # Test Noise:
 
-    # test_noise_1 = np.squeeze(static_noise)[0]
+
 
     test_set = ['sel123', 'sel233', 'sel302', 'sel307', 'sel820', 'sel853', 
                 'sel16420', 'sel16795', 'sele0106', 'sele0121', 'sel32', 'sel49', 

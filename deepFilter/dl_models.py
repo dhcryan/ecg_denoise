@@ -873,14 +873,15 @@ def FANformer_encoder(inputs,head_size,num_heads,hidden_dim=2048, ff_dim=64,drop
     res = x + inputs
     # FAN Layer 적용 (Feed Forward 부분)
     x = layers.LayerNormalization(epsilon=1e-6)(res)
-    x = FANLayer(output_dim=hidden_dim, p_ratio=0.25, activation="gelu", gated=False)(x)
-    x = FANLayer(output_dim=hidden_dim, p_ratio=0.25, activation="gelu", gated=False)(x)
-    x = FANLayer(output_dim=ff_dim, p_ratio=0.25, activation="gelu", gated=False)(x)
-
+    x = FANLayer(output_dim=inputs.shape[-1]*4, p_ratio=0.25, activation="gelu", gated=False)(x)
+    # x = FANLayer(output_dim=ff_dim*2, p_ratio=0.25, activation="gelu", gated=False)(x)
+    x = FANLayer(output_dim=inputs.shape[-1], p_ratio=0.25, activation="gelu", gated=False)(x)
     x = layers.Dropout(dropout)(x)
+    # x = FANLayer(output_dim=inputs.shape[-1], p_ratio=0.25, activation="linear", gated=False)(x)
+    
     # x = layers.Dense(inputs.shape[-1])(x)  # 최종 출력 크기 조정
     #    # x = layers.Conv1D(filters=inputs.shape[-1], kernel_size=1)(x) 밑에껀 이걸로 해도되긴함
-    x = FANLayer(output_dim=inputs.shape[-1], p_ratio=0.25, activation="linear", gated=False)(x)
+
     # x = layers.LayerNormalization(epsilon=1e-6)(res)
     # x = layers.Conv1D(filters=ff_dim, kernel_size=1, activation="relu")(x) 
     # x = layers.Dropout(dropout)(x)

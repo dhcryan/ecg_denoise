@@ -95,7 +95,7 @@ def train_dl(Dataset, experiment):
     minimum_lr = 1e-10
 
     # Loss function selection according to method implementation
-    if experiment == 'DRNN':
+    if experiment == 'DRNN' or experiment == 'AttentionSkipDAE':
         criterion = keras.losses.mean_squared_error
 
     elif experiment == 'FCN-DAE':

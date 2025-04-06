@@ -55,9 +55,9 @@ if __name__ == "__main__":
 
 # if __name__ == "__main__":
 
-#     dl_experiments = ['Transformer_DAE']
+#     dl_experiments = ['Dual_FreqDAE']
 #     current_date = datetime.now().strftime('%m%d')
-#     save_dir = f"test_results_125_noise_Transformer_DAE_{current_date}"
+#     save_dir = f"test_results_125_noise_Dual_FreqDAE_{current_date}"
 #     if not os.path.exists(save_dir):
 #         os.makedirs(save_dir)
 
@@ -80,7 +80,7 @@ if __name__ == "__main__":
 #                 Dataset, valid_train_indices, valid_test_indices = Data_Preparation(samples=512, noise_index=noise_idx)
 #                 X_train, y_train, X_test, y_test = Dataset
 #             # ✅ 모델 테스트 수행
-#             [X_test, y_test, y_pred] = test_dl(Dataset, 'Transformer_DAE')
+#             [X_test, y_test, y_pred] = test_dl(Dataset, 'Dual_FreqDAE')
 
 #             # ✅ 결과 저장
 #             result_filename = f'test_results_BW{bw_snr}_EM{em_snr}_MA{ma_snr}.pkl'

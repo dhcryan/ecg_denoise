@@ -82,7 +82,7 @@ def Data_Preparation_with_Fourier(samples, fs=360):
 #     with open('data/CombinedNoise_Test_125.pkl', 'rb') as input:
 #         all_test_noises = pickle.load(input)  # (125, 650000)
 #     test_noise_1 = all_test_noises[noise_index]  # 현재 실험할 test_noise 선택
-    # print(f"[INFO] Using Test Noise {noise_index + 1}/125")
+#     # print(f"[INFO] Using Test Noise {noise_index + 1}/125")
     seed = 1234
     np.random.seed(seed=seed)
     # Load QT Database

@@ -254,7 +254,7 @@ def test_dl(Dataset, experiment):
                   optimizer=tf.keras.optimizers.Adam(learning_rate=0.01),
                   metrics=[losses.mean_squared_error, losses.mean_absolute_error, ssd_loss, mad_loss])
     # # for 125
-    # model_dir = 'best'
+    #model_dir = '0221_FIXED'
     model_dir = current_date
     model_filepath = os.path.join(model_dir, model_label + '_weights.best.weights.h5')
 

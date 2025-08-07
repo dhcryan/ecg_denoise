@@ -1382,6 +1382,149 @@ def Dual_FreqDAE(signal_size = sigLen,head_size=64,num_heads=8,hidden_dim=2048,f
     model = Model(inputs=[time_input, freq_input], outputs=predictions)
     return model
 
+
+def transformer_encoder_with_attention(inputs, head_size, num_heads, ff_dim, dropout=0):
+    # Normalization and Attention
+    x = layers.LayerNormalization(epsilon=1e-6)(inputs)
+    # The MultiHeadAttention layer is modified to return attention scores
+    attention_layer = layers.MultiHeadAttention(
+        key_dim=head_size, num_heads=num_heads, dropout=dropout
+    )
+    x, attention_scores = attention_layer(x, x, return_attention_scores=True)
+    x = layers.Dropout(dropout)(x)
+    res = x + inputs
+
+    # Feed Forward Part
+    x = layers.LayerNormalization(epsilon=1e-6)(res)
+    x = layers.Conv1D(filters=ff_dim, kernel_size=1, activation="relu")(x)
+    x = layers.Dropout(dropout)(x)
+    x = layers.Conv1D(filters=inputs.shape[-1], kernel_size=1)(x)
+    
+    # The function now returns the output of the block and the attention scores
+    return x + res, attention_scores
+
+def Transformer_DAE_with_attention(signal_size=512, head_size=64, num_heads=2, ff_dim=64, num_transformer_blocks=2, dropout=0):
+    input_shape = (signal_size, 1)
+    input_tensor = layers.Input(shape=input_shape)
+
+    # --- Encoder (same as original) ---
+    ks = 13
+    x0 = layers.Conv1D(filters=16, kernel_size=ks, activation='linear', strides=2, padding='same')(input_tensor)
+    x0 = layers.Activation('sigmoid')(x0)
+    x0_ = layers.Conv1D(filters=16, kernel_size=ks, activation=None, strides=2, padding='same')(input_tensor)
+    xmul0 = layers.Multiply()([x0, x0_])
+    xmul0 = layers.BatchNormalization()(xmul0)
+
+    x1 = layers.Conv1D(filters=32, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul0)
+    x1 = layers.Activation('sigmoid')(x1)
+    x1_ = layers.Conv1D(filters=32, kernel_size=ks, activation=None, strides=2, padding='same')(xmul0)
+    xmul1 = layers.Multiply()([x1, x1_])
+    xmul1 = layers.BatchNormalization()(xmul1)
+
+    x2 = layers.Conv1D(filters=64, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul1)
+    x2 = layers.Activation('sigmoid')(x2)
+    x2_ = layers.Conv1D(filters=64, kernel_size=ks, activation='elu', strides=2, padding='same')(xmul1)
+    xmul2 = layers.Multiply()([x2, x2_])
+    xmul2 = layers.BatchNormalization()(xmul2)
+    
+    # --- Positional Encoding ---
+    position_embed = TFPositionalEncoding1D(signal_size)
+    x3 = xmul2 + position_embed(xmul2)
+
+    # --- Transformer Blocks ---
+    attention_scores_list = []
+    for _ in range(num_transformer_blocks):
+        x3, attention_scores = transformer_encoder_with_attention(x3, head_size, num_heads, ff_dim, dropout)
+        attention_scores_list.append(attention_scores)
+
+    # --- Decoder (same as original) ---
+    x4 = x3
+    x5 = Conv1DTranspose(input_tensor=x4, filters=64, kernel_size=ks, activation='elu', strides=1, padding='same')
+    x5 = layers.Add()([x5, xmul2])
+    x5 = layers.BatchNormalization()(x5)
+
+    x6 = Conv1DTranspose(input_tensor=x5, filters=32, kernel_size=ks, activation='elu', strides=2, padding='same')
+    x6 = layers.Add()([x6, xmul1])
+    x6 = layers.BatchNormalization()(x6)
+
+    x7 = Conv1DTranspose(input_tensor=x6, filters=16, kernel_size=ks, activation='elu', strides=2, padding='same')
+    x7 = layers.Add()([x7, xmul0])
+    x8 = layers.BatchNormalization()(x7)
+    
+    predictions = Conv1DTranspose(input_tensor=x8, filters=1, kernel_size=ks, activation='linear', strides=2, padding='same')
+
+    # The model now has two outputs: the final prediction and the list of attention scores
+    model = Model(inputs=input_tensor, outputs=[predictions] + attention_scores_list)
+    return model
+
+def FANformer_encoder_with_attention(inputs, head_size, num_heads, hidden_dim, ff_dim, dropout=0):
+    x = layers.LayerNormalization(epsilon=1e-6)(inputs)
+    attention_layer = layers.MultiHeadAttention(
+        key_dim=head_size, num_heads=num_heads, dropout=dropout
+    )
+    x, attention_scores = attention_layer(x, x, return_attention_scores=True)
+    x = layers.Dropout(dropout)(x)
+    res = x + inputs
+
+    x = layers.LayerNormalization(epsilon=1e-6)(res)
+    x = FANLayer(output_dim=inputs.shape[-1]*4, p_ratio=0.25, activation="gelu", gated=False)(x)
+    x = FANLayer(output_dim=inputs.shape[-1], p_ratio=0.25, activation="gelu", gated=False)(x)
+    x = layers.Dropout(dropout)(x)
+    return x + res, attention_scores
+
+def Dual_FreqDAE_with_attention(signal_size=512, head_size=64, num_heads=8, hidden_dim=2048, ff_dim=64, num_transformer_blocks=8, dropout=0):
+    input_shape = (signal_size, 1)
+    time_input = layers.Input(shape=input_shape)
+    freq_input = layers.Input(shape=input_shape)
+
+    ks = 13
+    x0 = layers.Conv1D(filters=16, kernel_size=ks, activation='linear', strides=2, padding='same')(time_input)
+    x0 = layers.Activation('sigmoid')(x0)
+    x0_ = layers.Conv1D(filters=16, kernel_size=ks, activation=None, strides=2, padding='same')(time_input)
+    xmul0 = layers.Multiply()([x0, x0_])
+    xmul0 = layers.BatchNormalization()(xmul0)
+
+    x1 = layers.Conv1D(filters=32, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul0)
+    x1 = layers.Activation('sigmoid')(x1)
+    x1_ = layers.Conv1D(filters=32, kernel_size=ks, activation=None, strides=2, padding='same')(xmul0)
+    xmul1 = layers.Multiply()([x1, x1_])
+    xmul1 = layers.BatchNormalization()(xmul1)
+
+    x2 = layers.Conv1D(filters=64, kernel_size=ks, activation='linear', strides=2, padding='same')(xmul1)
+    x2 = layers.Activation('sigmoid')(x2)
+    x2_ = layers.Conv1D(filters=64, kernel_size=ks, activation='elu', strides=2, padding='same')(xmul1)
+    xmul2 = layers.Multiply()([x2, x2_])
+    xmul2 = layers.BatchNormalization()(xmul2)
+    
+    f2 = frequency_branch(freq_input, 16, 13)
+
+    combined = layers.Concatenate()([xmul2, f2])
+    position_embed = TFPositionalEncoding1D(signal_size)
+    x3 = combined + position_embed(combined)
+
+    attention_scores_list = []
+    for _ in range(num_transformer_blocks):
+        x3, attention_scores = FANformer_encoder_with_attention(x3, head_size, num_heads, hidden_dim, ff_dim, dropout)
+        attention_scores_list.append(attention_scores)
+
+    x4 = x3
+    x5 = Conv1DTranspose(input_tensor=x4, filters=64, kernel_size=ks, activation='elu', strides=1, padding='same')
+    x5 = layers.Add()([x5, xmul2])
+    x5 = layers.BatchNormalization()(x5)
+
+    x6 = Conv1DTranspose(input_tensor=x5, filters=32, kernel_size=ks, activation='elu', strides=2, padding='same')
+    x6 = layers.Add()([x6, xmul1])
+    x6 = layers.BatchNormalization()(x6)
+
+    x7 = Conv1DTranspose(input_tensor=x6, filters=16, kernel_size=ks, activation='elu', strides=2, padding='same')
+    x7 = layers.Add()([x7, xmul0])
+    x8 = layers.BatchNormalization()(x7)
+    
+    predictions = Conv1DTranspose(input_tensor=x8, filters=1, kernel_size=ks, activation='linear', strides=2, padding='same')
+
+    model = Model(inputs=[time_input, freq_input], outputs=[predictions] + attention_scores_list)
+    return model
+
 # def Dual_Transformer_DAE(signal_size=sigLen, head_size=64, num_heads=16, ff_dim=64, num_transformer_blocks=4, dropout=0):
 #     input_shape = (signal_size, 1)
 #     time_input = Input(shape=input_shape)

@@ -997,7 +997,7 @@ class TFPositionalEncoding1D(tf.keras.layers.Layer):
 
         return self.cached_penc
         
-def Transformer_DAE(signal_size = sigLen,head_size=64,num_heads=2,ff_dim=64,num_transformer_blocks=2, dropout=0):   ###paper 1 model
+def Transformer_DAE(signal_size = sigLen,head_size=64,num_heads=8,ff_dim=64,num_transformer_blocks=8, dropout=0):   ###paper 1 model
 
     input_shape = (signal_size, 1)
     input = Input(shape=input_shape)

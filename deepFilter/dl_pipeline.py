@@ -9,8 +9,12 @@ from datetime import datetime
 from deepFilter.dl_models import *
 import os
 import shap
+import time
+from tabulate import tabulate
 
 current_date = datetime.now().strftime('%m%d')
+# Global dictionary to store inference times and FLOPs for comparison
+inference_times = {}
 # Custom loss SSD
 import tensorflow as tf
 
@@ -36,6 +40,8 @@ def mad_loss(y_true, y_pred):
 def train_dl(Dataset, experiment):
 
     print('Deep Learning pipeline: Training the model for exp ' + str(experiment))
+    
+    train_start_time = time.time()  # Training start time
     
     if experiment in ['Dual_FreqDAE']:
         [X_train, y_train, X_test, y_test, F_train_x, F_train_y, F_test_x, F_test_y] = Dataset
@@ -163,7 +169,7 @@ def train_dl(Dataset, experiment):
     # tensorboard --logdir=./runs_new
 
     if experiment in ['Dual_FreqDAE']:
-        model.fit(x=[X_train, F_train_x], y=y_train,
+        history = model.fit(x=[X_train, F_train_x], y=y_train,
                 validation_data=([X_val, F_val_x], y_val),
                 batch_size=batch_size,
                 epochs=epochs,
@@ -173,7 +179,7 @@ def train_dl(Dataset, experiment):
                             checkpoint,
                             tboard])
     else:
-        model.fit(x=X_train, y=y_train,
+        history = model.fit(x=X_train, y=y_train,
                 validation_data=(X_val, y_val),
                 batch_size=batch_size,
                 epochs=epochs,
@@ -183,6 +189,14 @@ def train_dl(Dataset, experiment):
                             checkpoint,
                             tboard])
     # model.save(model_filepath)
+    train_end_time = time.time()
+    training_time = train_end_time - train_start_time
+    actual_epochs = len(history.epoch)
+    avg_epoch_time = training_time / actual_epochs if actual_epochs > 0 else 0
+    inference_times[experiment] = inference_times.get(experiment, {})
+    inference_times[experiment]['training_time'] = avg_epoch_time
+    print(f"Average epoch training time for {experiment}: {avg_epoch_time:.4f} seconds (total: {training_time:.4f}s over {actual_epochs} epochs)")
+    
     K.clear_session()
 
 
@@ -264,14 +278,63 @@ def test_dl(Dataset, experiment):
 
     model.load_weights(model_filepath)
     
+    # Measure inference time and parameters
+    start_time = time.time()
+    
     if experiment in ['Dual_FreqDAE']:
         # Test score
         y_pred = model.predict([X_test, F_test_x], batch_size=batch_size, verbose=1)
-
     else:
         # Test score
         y_pred = model.predict(X_test, batch_size=batch_size, verbose=1)
-        
+    
+    end_time = time.time()
+    inference_time = end_time - start_time
+    
+    # Get number of parameters
+    params = model.count_params()
+    
+    # FLOPs calculation not available for TensorFlow models in this setup
+    flops = 'N/A'
+    
+    inference_times[experiment] = {'time': inference_time, 'params': params, 'flops': flops}
+    print(f"Inference time for {experiment}: {inference_time:.4f} seconds")
+    print(f"Parameters for {experiment}: {params}")
+    print(f"FLOPs for {experiment}: {flops}")
+    
     K.clear_session()
 
     return [X_test, y_test, y_pred]
+
+
+def print_inference_time_table():
+    """
+    Print a table comparing average epoch training time, inference times, parameters, and FLOPs of different models.
+    """
+    if not inference_times:
+        print("No data recorded.")
+        return
+    
+    table_data = []
+    for model, data in inference_times.items():
+        training_time = data.get('training_time', 'N/A')
+        time_taken = data.get('time', 'N/A')
+        params = data.get('params', 'N/A')
+        flops = data.get('flops', 'N/A')
+        table_data.append([
+            model,
+            f"{training_time:.4f} seconds" if isinstance(training_time, float) else training_time,
+            f"{time_taken:.4f} seconds" if isinstance(time_taken, float) else time_taken,
+            params,
+            flops
+        ])
+    
+    print("\nComputational Analysis Table:")
+    print(tabulate(table_data, headers=["Model", "Average Epoch Training Time (s)", "Inference Time", "Parameters", "FLOPs"], tablefmt="grid"))
+    
+    # Suggestions for model compression
+    print("\nSuggestions for Model Compression:")
+    print("- Pruning: Remove unnecessary weights to reduce model size and computation.")
+    print("- Quantization: Use lower precision (e.g., int8) for weights and activations.")
+    print("- Knowledge Distillation: Train a smaller model to mimic the larger one.")
+    print("- Lightweight Architectures: Consider MobileNet or EfficientNet variants for real-time deployment.")

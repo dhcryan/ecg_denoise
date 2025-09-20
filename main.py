@@ -12,12 +12,12 @@ from Data_Preparation.data_preparation import Data_Preparation
 from Data_Preparation.data_preparation_with_fourier import Data_Preparation_with_Fourier
 from Data_Preparation.data_preparation_only_fourier import Data_Preparation_only_Fourier
 from digitalFilters.dfilters import FIR_test_Dataset, IIR_test_Dataset, FIRRemoveBL, IIRRemoveBL
-from deepFilter.dl_pipeline import train_dl, test_dl
+from deepFilter.dl_pipeline import train_dl, test_dl, print_inference_time_table
 
 if __name__ == "__main__":
 
-    # dl_experiments = [ 'DRNN', 'DeepFilter','CNN_DAE','FCN_DAE','AttentionSkipDAE','Transformer_DAE','Dual_FreqDAE']
-    dl_experiments = ['Dual_FreqDAE']
+    dl_experiments = [ 'DRNN', 'DeepFilter','CNN_DAE','FCN_DAE','AttentionSkipDAE','Transformer_DAE','Dual_FreqDAE']
+
     train_time_list = []
     test_time_list = []
     
@@ -45,6 +45,9 @@ if __name__ == "__main__":
         with open(os.path.join(save_dir, 'test_results_' + experiment + '.pkl'), 'wb') as output:
             pickle.dump(test_results, output)
         print('Results from experiment ' + experiment + ' saved')
+
+    # Print the inference time comparison table
+    print_inference_time_table()
 
 # import _pickle as pickle
 # import os

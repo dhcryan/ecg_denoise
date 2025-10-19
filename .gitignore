@@ -30,3 +30,4 @@ log/
 *.csv
 /fig10/*
 *.pdf
+*.html

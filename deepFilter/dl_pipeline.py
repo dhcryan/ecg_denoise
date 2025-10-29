@@ -8,7 +8,10 @@ import tensorflow as tf
 from datetime import datetime
 from deepFilter.dl_models import *
 import os
-import shap
+try:
+    import shap  # optional; only present for explainability utilities
+except ImportError:
+    shap = None
 import time
 from tabulate import tabulate
 

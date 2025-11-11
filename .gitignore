@@ -8,7 +8,8 @@
 ###############################
 !/.gitignore
 !/.git/**
-!dual_freqdae_repo/**
+!/dual_freqdae_repo
+!/dual_freqdae_repo/**
 !/README.md
 
 ###############################

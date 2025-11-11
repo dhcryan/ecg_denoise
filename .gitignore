@@ -27,6 +27,12 @@ dual_freqdae_repo/**/cache/*
 dual_freqdae_repo/**/tmp/*
 dual_freqdae_repo/**/logs/*
 dual_freqdae_repo/**/figures/*
+dual_freqdae_repo/**/*.pkl
+
+###############################
+# Keep empty data directory placeholder
+###############################
+!dual_freqdae_repo/data/.gitkeep
 
 ###############################
 # Optional model weight patterns (if you don't want to track future retrains)

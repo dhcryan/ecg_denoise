@@ -1,35 +1,40 @@
-# Folders to ignore
-/__pycache__/*
-/TBoard_Graph/*
-/.idea/*
-/run*/*
-deepFilter/__pycache__/*
-digitalFilter/__pycache__/*
-utils/__pycache__/*
-/data/*
-/exp/*
-# Files to ignore
-*.pyc
-*.png
-*.npy
-*.hdf5
-*.pkl
-*.gz
-*.mat
-*.zip
-tes*
-.directory
-*.txt
-.ipynb_checkpoints
-*.hdf5
-*.h5
-*.tex
-*.json
-/cinc2017/*
-log/
-*.csv
-/fig10/*
-*.pdf
-*.html
-*.npz
-*.v2
+###############################
+# Global ignore everything by default
+###############################
+/*
+
+###############################
+# Allow the minimal Dual_FreqDAE repository and git metadata
+###############################
+!/.gitignore
+!/.git/**
+!dual_freqdae_repo/**
+
+###############################
+# Inside the minimal repo keep all by default (no overrides)
+###############################
+
+###############################
+# Ignore large binary / intermediate artifacts inside minimal repo if produced later
+###############################
+dual_freqdae_repo/**/*.ipynb_checkpoints/*
+dual_freqdae_repo/**/*.pyc
+dual_freqdae_repo/**/__pycache__/*
+dual_freqdae_repo/**/runs_*/*
+dual_freqdae_repo/**/cache/*
+dual_freqdae_repo/**/tmp/*
+dual_freqdae_repo/**/logs/*
+dual_freqdae_repo/**/figures/*
+
+###############################
+# Optional model weight patterns (if you don't want to track future retrains)
+###############################
+# dual_freqdae_repo/**/Dual_FreqDAE_weights.best.weights.h5
+# dual_freqdae_repo/**/*.h5
+# dual_freqdae_repo/**/*.hdf5
+
+###############################
+# Allow docs and README always
+###############################
+!dual_freqdae_repo/README.md
+!dual_freqdae_repo/docs/**

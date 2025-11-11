@@ -42,7 +42,7 @@ if str(REPO_ROOT) not in sys.path:
 	sys.path.insert(0, str(REPO_ROOT))
 
 from deepFilter.dl_models import Dual_FreqDAE  # noqa: E402
-from utils.metrics import PRD, COS_SIM, SNR, RMSE  # noqa: E402
+from utils.metrics import SSD, MAD, PRD, COS_SIM, SNR  # noqa: E402
 from Data_Preparation.data_preparation_with_fourier import Data_Preparation_with_Fourier  # noqa: E402
 
 def combined_ssd_mad_loss(y_true, y_pred):
@@ -138,7 +138,8 @@ def evaluate(model, Dataset, weights_path: Path, exp_dir: Path):
 	y_pred = model.predict([X_test, F_test_x], batch_size=128, verbose=1)
 
 	# New metric set: RMSE, PRD, COS_SIM, SNR
-	rmse = RMSE(y_test, y_pred)
+	# RMSE per sample
+	rmse = np.sqrt(np.mean(np.square(y_test - y_pred), axis=1))
 	prd = PRD(y_test, y_pred)
 	cos = COS_SIM(y_test, y_pred).reshape(-1)
 	snr = SNR(y_test, y_pred)

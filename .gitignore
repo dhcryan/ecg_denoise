@@ -9,6 +9,7 @@
 !/.gitignore
 !/.git/**
 !dual_freqdae_repo/**
+!/README.md
 
 ###############################
 # Inside the minimal repo keep all by default (no overrides)

@@ -31,3 +31,5 @@ log/
 /fig10/*
 *.pdf
 *.html
+*.npz
+*.v2

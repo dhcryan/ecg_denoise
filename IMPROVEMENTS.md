@@ -241,5 +241,20 @@ cat ajou_outputs/evaluation_report.txt
 
 ---
 
+## 🧾 리뷰 대응: 최신 Baseline 확장 (SOTA claim 관련)
+
+리뷰 의견: 기존 baseline set에 최근 **diffusion 기반 denoiser**, **현대 GAN 기반 restoration**, **최신 DAE 변형**이 포함되지 않아 SOTA 주장에 제약이 있다는 지적.
+
+대응 방향(둘 중 병행):
+- (A) 대표 모델 2–3개를 추가 비교에 포함
+- (B) 추가 비교 전까지는 “**비교한 baseline 범위 내에서**” 성능 우수/경쟁력 문구로 톤다운
+
+추가로 반영 예정인 대표 모델(3개):
+- Operational CycleGAN 기반 blind restoration: https://github.com/OzerCanDevecioglu/Blind-ECG-Restoration-by-Operational-Cycle-GANs.git
+- Score-based / diffusion ECG denoising: https://github.com/HuayuLiArizona/Score-based-ECG-Denoising.git
+- Fully-gated DAE: https://github.com/AhmedAShaheen/fully_gated_DAE.git
+
+---
+
 **마지막 수정**: 2025년 10월 18일
 **버전**: finetuned.ipynb v2 (R-Peak Detection Based)

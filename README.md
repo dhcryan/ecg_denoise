@@ -12,6 +12,11 @@ Dual_FreqDAE is a dual-branch denoising autoencoder for single-beat ECG segments
 
 Target use case: Remove mixed baseline/wideband noise while preserving morphological fidelity (P-QRS-T) for downstream tasks.
 
+**Baseline coverage note (for paper/review context).** This codebase currently benchmarks Dual_FreqDAE against classical filters and several deep denoisers (e.g., CNN/RNN/Transformer variants used in our experiments). Recent diffusion-based ECG denoisers and modern GAN-based restorers are not yet included here; therefore, any “SOTA” wording should be interpreted as **within the compared baseline set**. We are extending the baseline suite with representative contenders:
+- Operational CycleGAN-based blind ECG restoration: https://github.com/OzerCanDevecioglu/Blind-ECG-Restoration-by-Operational-Cycle-GANs.git
+- Score-based (diffusion) ECG denoising: https://github.com/HuayuLiArizona/Score-based-ECG-Denoising.git
+- Fully-gated DAE variant: https://github.com/AhmedAShaheen/fully_gated_DAE.git
+
 ## 2. Directory Structure
 ```
 dual_freqdae_repo/

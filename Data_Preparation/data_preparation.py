@@ -1,12 +1,16 @@
 import glob
 import numpy as np
 from scipy.signal import resample_poly
-import wfdb
 import math
 import _pickle as pickle
 import numpy as np
 import pickle
-import wfdb
+
+# Optional dependency: the current QTDB+CombinedNoise pickle pipeline does not require wfdb.
+try:
+    import wfdb  # type: ignore
+except ImportError:  # pragma: no cover
+    wfdb = None
 
 def Data_Preparation(samples):
     with open('data/CombinedNoise_Test.pkl', 'rb') as input:

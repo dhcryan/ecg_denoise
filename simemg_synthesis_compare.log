@@ -1,0 +1,33 @@
+/home/dhc99/ecg_denoise/tools/eval_simemg_compare_synthesis.py:12: UserWarning: A NumPy version >=1.23.5 and <2.3.0 is required for this version of SciPy (detected version 2.3.3)
+  from scipy.io import loadmat
+2025-12-28 21:43:03.275102: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2025-12-28 21:43:03.308029: E external/local_xla/xla/stream_executor/cuda/cuda_fft.cc:477] Unable to register cuFFT factory: Attempting to register factory for plugin cuFFT when one has already been registered
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+E0000 00:00:1766925783.345575 2616538 cuda_dnn.cc:8310] Unable to register cuDNN factory: Attempting to register factory for plugin cuDNN when one has already been registered
+E0000 00:00:1766925783.350287 2616538 cuda_blas.cc:1418] Unable to register cuBLAS factory: Attempting to register factory for plugin cuBLAS when one has already been registered
+2025-12-28 21:43:03.380052: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 AVX_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+TF: 2.18.0
+[INFO] Built sequences: X=(330, 3600, 1) Y=(330, 3600, 1)
+[SKIP] 0221_fixed:DeepFilter missing 0221_fixed/DeepFilter_weights.best.weights.h5
+[SKIP] 0221_fixed:Transformer_DAE missing 0221_fixed/Transformer_DAE_weights.best.weights.h5
+[SKIP] 0221_fixed:Dual_FreqDAE missing 0221_fixed/Dual_FreqDAE_weights.best.weights.h5
+Traceback (most recent call last):
+  File "/home/dhc99/ecg_denoise/tools/eval_simemg_compare_synthesis.py", line 514, in <module>
+    main()
+  File "/home/dhc99/ecg_denoise/tools/eval_simemg_compare_synthesis.py", line 502, in main
+    run_one_setting(
+  File "/home/dhc99/ecg_denoise/tools/eval_simemg_compare_synthesis.py", line 449, in run_one_setting
+    raise RuntimeError(f"No results produced for tag={tag}")
+RuntimeError: No results produced for tag=0221_fixed
+/home/dhc99/ecg_denoise/tools/eval_simemg_compare_synthesis.py:12: UserWarning: A NumPy version >=1.23.5 and <2.3.0 is required for this version of SciPy (detected version 2.3.3)
+  from scipy.io import loadmat
+2025-12-28 21:43:13.490298: I tensorflow/core/util/port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2025-12-28 21:43:13.519687: E external/local_xla/xla/stream_executor/cuda/cuda_fft.cc:477] Unable to register cuFFT factory: Attempting to register factory for plugin cuFFT when one has already been registered
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+E0000 00:00:1766925793.574702 2616649 cuda_dnn.cc:8310] Unable to register cuDNN factory: Attempting to register factory for plugin cuDNN when one has already been registered
+E0000 00:00:1766925793.595055 2616649 cuda_blas.cc:1418] Unable to register cuBLAS factory: Attempting to register factory for plugin cuBLAS when one has already been registered
+2025-12-28 21:43:13.636187: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 AVX_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+/home/dhc99/anaconda3/envs/ECGDENOISE/lib/python3.12/site-packages/keras/src/layers/convolutional/base_conv.py:107: UserWarning: Do not pass an `input_shape`/`input_dim` argument to a layer. When using Sequential models, prefer using an `Input(shape)` object as the first layer in the model instead.
+  super().__init__(activity_regularizer=activity_regularizer, **kwargs)

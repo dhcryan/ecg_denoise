@@ -135,11 +135,11 @@ def load_inputs(path: str | None, demo: bool, batch: int, *, segment: bool, hop:
     return arr.astype(np.float32, copy=False)
 
 
-def build_model(weights_path: str | None):
+def build_model(weights_path: str | None, *, fusion: str = "concat"):
     import tensorflow as tf
     from keras import losses
 
-    model = Dual_FreqDAE()
+    model = Dual_FreqDAE(fusion=fusion)
     # compile with same metrics (loss not used for inference but keeps parity)
     model.compile(
         loss="mse",
@@ -162,6 +162,7 @@ def main():
     parser.add_argument("--input", type=str, default=None, help=".npy file or directory of .npy files")
     parser.add_argument("--output", type=str, default="denoised.npy", help="Path to save denoised output .npy")
     parser.add_argument("--weights", type=str, default=str(Path("0221_FIXED")/"Dual_FreqDAE_weights.best.weights.h5"), help="Weights path (.h5)")
+    parser.add_argument("--fusion", type=str, default="concat", choices=["concat", "concat_mlp", "cross_attn"], help="Fusion mode (must match weights)")
     parser.add_argument("--fs", type=int, default=360, help="Sampling rate used for Fourier features (default 360)")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--demo", action="store_true", help="Run with synthetic demo inputs instead of loading files")
@@ -185,7 +186,7 @@ def main():
     F_in = F[..., None]
 
     # 4) Build model and load weights
-    model = build_model(args.weights)
+    model = build_model(args.weights, fusion=args.fusion)
 
     # 5) Run inference
     y_hat = model.predict([X_in, F_in], batch_size=args.batch_size, verbose=1)

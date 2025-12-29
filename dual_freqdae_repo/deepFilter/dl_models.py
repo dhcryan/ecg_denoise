@@ -1260,7 +1260,66 @@ def frequency_branch(input_tensor, filters, kernel_size=13):
 
     return xmul2
 
-def Dual_FreqDAE(signal_size = sigLen,head_size=64,num_heads=8,hidden_dim=2048,ff_dim=64,num_transformer_blocks=8, dropout=0):   ###paper 1 model
+
+def _dual_freqdae_fuse(time_feat, freq_feat, *, fusion: str, num_heads: int):
+    """Fuse time/freq branch features.
+
+    Shapes are expected to be (batch, steps, channels) and steps must match.
+
+    fusion:
+      - 'concat'       : plain concatenation (original behavior)
+      - 'concat_mlp'   : concat then point-wise Dense+BN mixing
+      - 'cross_attn'   : time queries over freq (MHA), then concat(time, attn)
+    """
+
+    fusion = (fusion or "concat").lower()
+
+    if fusion == "concat":
+        return layers.Concatenate(name="fusion_concat")([time_feat, freq_feat])
+
+    if fusion == "concat_mlp":
+        x = layers.Concatenate(name="fusion_concat")([time_feat, freq_feat])
+        out_dim = x.shape[-1]
+        if out_dim is None:
+            t_dim = int(time_feat.shape[-1] or 64)
+            f_dim = int(freq_feat.shape[-1] or 64)
+            out_dim = t_dim + f_dim
+        else:
+            out_dim = int(out_dim)
+        x = layers.Dense(out_dim, activation="elu", name="fusion_mlp_dense")(x)
+        x = layers.BatchNormalization(name="fusion_mlp_bn")(x)
+        return x
+
+    if fusion == "cross_attn":
+        # Keep capacity comparable: attention output has same channel size as time_feat.
+        c = time_feat.shape[-1]
+        c = int(c) if c is not None else 64
+        nh = int(num_heads) if num_heads is not None else 8
+        nh = max(1, nh)
+        key_dim = max(1, c // nh)
+        attn = layers.MultiHeadAttention(
+            num_heads=nh,
+            key_dim=key_dim,
+            output_shape=c,
+            name="fusion_cross_mha",
+        )(query=time_feat, value=freq_feat, key=freq_feat)
+        attn = layers.BatchNormalization(name="fusion_cross_bn")(attn)
+        return layers.Concatenate(name="fusion_cross_concat")([time_feat, attn])
+
+    raise ValueError(
+        f"Unknown fusion='{fusion}'. Expected one of: concat, concat_mlp, cross_attn"
+    )
+
+def Dual_FreqDAE(
+    signal_size=sigLen,
+    head_size=64,
+    num_heads=8,
+    hidden_dim=2048,
+    ff_dim=64,
+    num_transformer_blocks=8,
+    dropout=0,
+    fusion: str = "concat",
+):   ###paper 1 model
     input_shape = (signal_size, 1)
     time_input = Input(shape=input_shape)
     
@@ -1328,8 +1387,8 @@ def Dual_FreqDAE(signal_size = sigLen,head_size=64,num_heads=8,hidden_dim=2048,f
     
     f2 = frequency_branch(freq_input, 16, 13)
 
-    # 시간 및 주파수 도메인 특성 결합
-    combined = layers.Concatenate()([xmul2, f2])    
+    # 시간 및 주파수 도메인 특성 결합 (ablation-ready)
+    combined = _dual_freqdae_fuse(xmul2, f2, fusion=fusion, num_heads=num_heads)
     position_embed = TFPositionalEncoding1D(signal_size)
     x3 = combined+position_embed(combined)
     #

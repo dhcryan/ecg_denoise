@@ -49,8 +49,8 @@ def combined_ssd_mad_loss(y_true, y_pred):
 	# same as original pipeline
 	return tf.reduce_max(tf.square(y_true - y_pred), axis=-2) * 50 + tf.reduce_sum(tf.square(y_true - y_pred), axis=-2)
 
-def build_model(signal_size: int = 512):
-	model = Dual_FreqDAE(signal_size=signal_size)
+def build_model(signal_size: int = 512, *, fusion: str = "concat"):
+	model = Dual_FreqDAE(signal_size=signal_size, fusion=fusion)
 	lr = 1e-3
 	model.compile(
 		loss=combined_ssd_mad_loss,
@@ -168,6 +168,14 @@ def parse_args():
 	p = argparse.ArgumentParser(description="Train/Evaluate Dual_FreqDAE model")
 	p.add_argument('--data-prep-samples', type=int, default=512, help='Signal length (must match model)')
 	p.add_argument('--exp-dir', type=str, default='experiments/dual_freqdae', help='Output experiment directory')
+	p.add_argument('--cache-dir', type=str, default=None, help='Optional shared cache directory for dataset (.npz)')
+	p.add_argument(
+		'--fusion',
+		type=str,
+		default='concat',
+		choices=['concat', 'concat_mlp', 'cross_attn'],
+		help='Fusion mode for time/frequency features (ablation)'
+	)
 	p.add_argument('--epochs', type=int, default=int(1e5), help='Max epochs (original pipeline default)')
 	p.add_argument('--patience', type=int, default=10, help='Early stopping patience (original)')
 	p.add_argument('--min-delta', type=float, default=0.05, help='Early stopping & LR reduce min_delta (original)')
@@ -181,13 +189,14 @@ def parse_args():
 def main():
 	args = parse_args()
 	exp_dir = Path(args.exp_dir)
+	cache_dir = Path(args.cache_dir) if args.cache_dir else (exp_dir / 'cache')
 
 	print("[STEP] Preparing dataset...")
-	Dataset = prepare_dataset(samples=args.data_prep_samples, reuse_cache=args.reuse_cache, cache_dir=exp_dir / 'cache')
+	Dataset = prepare_dataset(samples=args.data_prep_samples, reuse_cache=args.reuse_cache, cache_dir=cache_dir)
 	print(f"[INFO] Dataset ready: train {Dataset[0].shape}, test {Dataset[2].shape}")
 
 	print("[STEP] Building model...")
-	model = build_model(signal_size=args.data_prep_samples)
+	model = build_model(signal_size=args.data_prep_samples, fusion=args.fusion)
 	model.summary()
 
 	weights_path = exp_dir / "Dual_FreqDAE_weights.best.weights.h5"

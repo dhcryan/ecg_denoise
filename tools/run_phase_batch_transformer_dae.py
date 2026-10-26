@@ -40,7 +40,7 @@ import tensorflow as tf
 
 
 def _infer_transformer_dae_arch_from_weights(weights_path: str) -> Tuple[Optional[int], bool]:
-    """Infer architecture knobs from a Keras 3 .weights.h5 file.
+    """Infer partial architecture knobs from a Keras 3 `.weights.h5` file.
 
     Returns:
       (num_transformer_blocks or None, use_gated_noise)
@@ -58,6 +58,40 @@ def _infer_transformer_dae_arch_from_weights(weights_path: str) -> Tuple[Optiona
     n_mha = sum(1 for k in layer_keys if k.startswith("multi_head_attention"))
     use_gated_noise = any(k.startswith("add_gated_noise") for k in layer_keys)
     return (n_mha if n_mha > 0 else None), use_gated_noise
+
+
+def _infer_attention_dims_from_weights(weights_path: str) -> Tuple[Optional[int], Optional[int]]:
+    """Infer (num_heads, head_size) from attention projection weight shapes.
+
+    For our compat attention, query/key/value kernels typically have shape:
+      (d_model, num_heads, head_size)
+    """
+    if not weights_path.endswith(".h5"):
+        return None, None
+    try:
+        with h5py.File(weights_path, "r") as f:
+            layers = f.get("layers")
+            if layers is None:
+                return None, None
+            attn = layers.get("multi_head_attention")
+            if attn is None:
+                # Some checkpoints may start at _0 or use a different naming; bail out.
+                return None, None
+            q = attn.get("query_dense")
+            if q is None or "vars" not in q or "0" not in q["vars"]:
+                return None, None
+            qk = np.array(q["vars"]["0"])
+    except Exception:
+        return None, None
+
+    if qk.ndim != 3:
+        return None, None
+    # (d_model, num_heads, head_size)
+    num_heads = int(qk.shape[1])
+    head_size = int(qk.shape[2])
+    if num_heads <= 0 or head_size <= 0:
+        return None, None
+    return num_heads, head_size
 
 
 def _manual_load_attention_qkvo_from_weights(model: keras.Model, weights_path: str, num_blocks: int) -> None:
@@ -688,10 +722,13 @@ def _build_model_and_load(cfg: RunConfig):
 
     # 2) Fallback: attempt a compatibility build based on what we can infer.
     n_blocks, use_gated_noise = _infer_transformer_dae_arch_from_weights(pretrained_path)
+    n_heads, head_size = _infer_attention_dims_from_weights(pretrained_path)
+    n_heads = int(n_heads or 8)
+    head_size = int(head_size or 64)
     model = _build_transformer_dae_compat(
         signal_size=cfg.win,
-        head_size=64,
-        num_heads=8,
+        head_size=head_size,
+        num_heads=n_heads,
         ff_dim=64,
         num_transformer_blocks=int(n_blocks or 8),
         dropout=0.0,

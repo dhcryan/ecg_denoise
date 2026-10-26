@@ -188,4 +188,3 @@ dependencies:
       - wcwidth==0.2.5
       - webencodings==0.5.1
       - wfdb==3.1.1
-prefix: /home/dhc99/anaconda3/envs/DeepFilter

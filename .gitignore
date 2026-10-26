@@ -1,37 +1,84 @@
-# Folders to ignore
-/__pycache__/*
-/TBoard_Graph/*
-/.idea/*
-/run*/*
-deepFilter/__pycache__/*
-digitalFilter/__pycache__/*
-utils/__pycache__/*
-/data/*
-/exp/*
-# Files to ignore
-*.pyc
-*.png
-*.npy
-*.hdf5
-*.pkl
-*.gz
-*.mat
-*.zip
-tes*
+# Python, notebook and editor caches
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.cache/
+.idea/
 .directory
-*.txt
-.ipynb_checkpoints
+/TBoard_Graph/
+
+# Local credentials and machine configuration
+.env
+.env.*
+!.env.example
+!.env.template
+.aws/
+.ssh/
+*.pem
+*.key
+id_rsa
+id_ed25519
+/.codex
+
+# Private recordings, participant identifiers and derived clinical outputs
+/ajou_data*/
+/ajou_real/
+/ajou_finetune/
+/ajou_outputs*/
+/ajou_*_summary.csv
+/kayoung/
+/solmi/
+/deliverables/
+/reports/
+/docs/history/
+/docs/INTERIM_GENERALIZATION_REPORT_260101.md
+
+# Real-data notebooks can embed identifiers and clinical traces in outputs.
+# Basename rules cover both the old root location and notebooks/.
+ajou_ecg_deepfilter_beataug.ipynb
+wet_model_compare_report.ipynb
+finetuned.ipynb
+finetuned_improved.ipynb
+ecg_processing_ref.ipynb
+
+# Local archives and backups may contain the same private information.
+/archive/*
+!/archive/README.md
+
+# Downloaded datasets, generated experiment artifacts and vendor checkouts
+/data/
+/data2/
+/data_cinc/
+/cinc17/
+/cinc2017/
+/exp/
+/exported/
+/external/
+/run*/*
+/test_results_*/
+log/
+*.log
+
+# Binary datasets, weights, reports and generated figures
+*.npy
+*.npz
+*.pkl
+*.mat
 *.hdf5
 *.h5
-*.tex
-*.json
-/cinc2017/*
-log/
-*.csv
-/fig10/*
-*.pdf
-*.html
-*.npz
+*.pth
 *.rpd
 *.v2
-*.pth
+*.png
+*.pdf
+*.docx
+*.xlsx
+*.html
+*.csv
+*.json
+*.txt
+!requirements.txt
+!requirements-*.txt
+*.tex
+*.gz
+*.zip
